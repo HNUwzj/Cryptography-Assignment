@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CryptoDash - 密码学综合服务系统</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            },
+            svg: {
+                fontCache: 'global'
+            }
+        };
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Poppins', 'Microsoft YaHei', sans-serif;
+        }
+        body {
+            background-color: #f4f7fe;
+            color: #2b3674;
+            display: flex;
+            min-height: 100vh;
+        }
+        /* Sidebar Styles */
+        .sidebar {
+            width: 280px;
+            background-color: #ffffff;
+            padding: 30px 20px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 2px 0 20px rgba(0, 0, 0, 0.05);
+            z-index: 10;
+        }
+        .logo {
+            font-size: 26px;
+            font-weight: 700;
+            color: #2b3674;
+            margin-bottom: 40px;
+            text-align: center;
+            letter-spacing: 1px;
+        }
+        .logo span {
+            color: #4568dc;
+        }
+        .nav-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            flex-grow: 1;
+        }
+        .tab-btn {
+            padding: 14px 20px;
+            background: transparent;
+            border: none;
+            color: #a3aed1;
+            font-size: 15px;
+            font-weight: 500;
+            text-align: left;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+        }
+        .tab-btn:hover {
+            background-color: #f4f7fe;
+            color: #4568dc;
+        }
+        .tab-btn.active {
+            background-color: #f4f7fe;
+            color: #4568dc;
+            font-weight: 600;
+        }
+        /* AI Assistant Button in Sidebar */
+        .ai-assistant-btn {
+            margin-top: auto;
+            background: linear-gradient(to right, #b06ab3, #4568dc);
+            border: none;
+            color: #ffffff;
+            border-radius: 12px;
+            padding: 12px 14px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 5px 15px rgba(69, 104, 220, 0.3);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .ai-assistant-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(69, 104, 220, 0.35);
+        }
+        .ai-assistant-btn:focus {
+            outline: 2px solid #4568dc;
+            outline-offset: 2px;
+        }
+
+        /* AI Assistant Modal */
+        .ai-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(17, 25, 40, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 18px;
+        }
+        .ai-modal.open {
+            display: flex;
+        }
+        .ai-modal-card {
+            width: min(720px, 100%);
+            max-height: 85vh;
+            background: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.18);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .ai-modal-header {
+            padding: 14px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e9eefb;
+            color: #2b3674;
+            font-weight: 600;
+        }
+        .ai-close-btn {
+            width: 32px;
+            height: 32px;
+            border: none;
+            border-radius: 8px;
+            background: #f4f7fe;
+            color: #2b3674;
+            cursor: pointer;
+            font-size: 18px;
+            line-height: 1;
+            box-shadow: none;
+            margin: 0;
+            padding: 0;
+        }
+        .ai-close-btn:hover {
+            background: #e8eefc;
+        }
+        .ai-modal-body {
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .chat-history {
+            flex-grow: 1;
+            overflow-y: auto;
+            font-size: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding-right: 5px;
+            background: white;
+            border-radius: 12px;
+            padding: 10px;
+            border: 1px solid #e2e8f0;
+            min-height: 240px;
+            max-height: 55vh;
+        }
+        .chat-msg {
+            padding: 8px 10px;
+            border-radius: 8px;
+            line-height: 1.4;
+            white-space: normal;
+            word-break: break-word;
+        }
+        .chat-msg.user {
+            background-color: #f4f7fe;
+            align-self: flex-end;
+            margin-left: 20px;
+            color: #2b3674;
+        }
+        .chat-msg.ai {
+            background-color: #4568dc;
+            color: white;
+            align-self: flex-start;
+            margin-right: 20px;
+        }
+        .ai-modal-body input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+        .ai-modal-body input:focus {
+            outline: none;
+            border-color: #4568dc;
+        }
+        .help-btn {
+            background: linear-gradient(to right, #b06ab3, #4568dc);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 10px;
+            font-size: 13px;
+            cursor: pointer;
+            width: 120px;
+            font-weight: 600;
+            transition: opacity 0.2s;
+            margin: 0;
+            box-shadow: 0 5px 15px rgba(69, 104, 220, 0.2);
+        }
+        .help-btn:hover {
+            opacity: 0.9;
+        }
+        .ai-input-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .ai-input-row input {
+            margin: 0;
+        }
+        
+        /* Main Content */
+        .main-content {
+            flex-grow: 1;
+            padding: 40px 50px;
+            overflow-y: auto;
+            max-height: 100vh;
+        }
+        .header {
+            margin-bottom: 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            font-size: 32px;
+            color: #2b3674;
+            margin-bottom: 5px;
+        }
+        .header p {
+            color: #a3aed1;
+            font-size: 15px;
+        }
+        .status-container {
+            display: flex;
+            align-items: center;
+            background: #ffffff;
+            padding: 10px 20px;
+            border-radius: 50px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .status-ok { color: #00ce84; margin-left:10px; font-weight: 600; }
+        .status-error { color: #ff5b5b; margin-left:10px; font-weight: 600; }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.4s ease;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .algorithm-card {
+            background: #ffffff;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.03);
+            margin-bottom: 25px;
+        }
+        .algorithm-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: #2b3674;
+            margin-bottom: 10px;
+        }
+        .algorithm-desc {
+            color: #a3aed1;
+            font-size: 14px;
+            margin-bottom: 25px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #2b3674;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        input[type="text"], input[type="number"], textarea {
+            width: 100%;
+            padding: 15px;
+            background: #f8f9fa;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            color: #2b3674;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        input[type="text"]:focus, input[type="number"]:focus, textarea:focus {
+            outline: none;
+            border-color: #4568dc;
+            background: #ffffff;
+        }
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+        button {
+            padding: 12px 28px;
+            background: linear-gradient(to right, #b06ab3, #4568dc);
+            border: none;
+            color: #ffffff;
+            font-weight: 600;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 12px;
+            margin-bottom: 12px;
+            box-shadow: 0 5px 15px rgba(69, 104, 220, 0.3);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(69, 104, 220, 0.4);
+        }
+        
+        /* Secondary tabs for sub-content */
+        .sub-tabs {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        .sub-tab-btn {
+            background: #f4f7fe;
+            color: #a3aed1;
+            border-radius: 10px;
+            box-shadow: none;
+            padding: 10px 20px;
+        }
+        .sub-tab-btn.active {
+            background: #4568dc;
+            color: #ffffff;
+            box-shadow: 0 4px 10px rgba(69,104,220,0.2);
+        }
+
+        .result {
+            margin-top: 25px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 16px;
+            border-left: 5px solid #00ce84;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.02);
+            display: none;
+        }
+        .result.error {
+            border-left-color: #ff5b5b;
+        }
+        .result-label {
+            color: #a3aed1;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+        .result-value {
+            font-family: monospace;
+            word-break: break-all;
+            color: #2b3674;
+            font-size: 15px;
+        }
+
+        .row {
+            display: flex;
+            gap: 25px;
+        }
+        .col {
+            flex: 1;
+        }
+        .info-box {
+            background: #eef2ff;
+            color: #4568dc;
+            padding: 15px 20px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+        }
+        .key-config {
+            background: #ffffff;
+            padding: 25px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.03);
+            margin-bottom: 25px;
+            border: 1px solid #f4f7fe;
+        }
+        .key-config h4 {
+            color: #2b3674;
+            margin-bottom: 20px;
+            font-size: 18px;
+        }
+        hr {
+            border: none;
+            border-top: 1px solid #e2e8f0;
+            margin: 30px 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="logo">Crypto<span>Dash</span></div>
+        <div class="nav-menu">
+            <button class="tab-btn active" onclick="showTab('affine')">仿射加密</button>
+            <button class="tab-btn" onclick="showTab('stream')">流密码</button>
+            <button class="tab-btn" onclick="showTab('des')">DES 对称加密</button>
+            <button class="tab-btn" onclick="showTab('rsa')">RSA 非对称加密</button>
+            <button class="tab-btn" onclick="showTab('dh')">D-H 密钥交换</button>
+            <button class="tab-btn" onclick="showTab('hash')">散列函数</button>
+            <button class="tab-btn" onclick="showTab('signature')">数字签名</button>
+        </div>
+
+        <button class="ai-assistant-btn" id="aiAssistantBtn" onclick="openAIAssistant()">打开 AI 助手</button>
+    </div>
+
+    <div class="ai-modal" id="aiModal" aria-hidden="true">
+        <div class="ai-modal-card" role="dialog" aria-modal="true" aria-labelledby="aiModalTitle">
+            <div class="ai-modal-header">
+                <span id="aiModalTitle">🤖 AI 助手</span>
+                <button class="ai-close-btn" onclick="closeAIAssistant()" aria-label="关闭">×</button>
+            </div>
+            <div class="ai-modal-body">
+                <div id="chatHistory" class="chat-history">
+                    <div class="chat-msg ai">你好，我是密码学助手。有任何问题都可以问我！</div>
+                </div>
+                <div class="ai-input-row">
+                    <input type="text" id="chatInput" placeholder="输入问题..." onkeypress="handleChatEnter(event)" />
+                    <button class="help-btn" onclick="sendChatMessage()">发送请求</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="header">
+            <div>
+                <h1>Welcome to CryptoDash.</h1>
+                <p>Select an algorithm to start!</p>
+            </div>
+            <div class="status-container">
+                系统状态: <span id="status" class="status-error">检查中...</span>
+            </div>
+        </div>
+
+        <!-- 仿射加密 -->
+        <div id="affine" class="tab-content active">
+            <div class="algorithm-card">
+                <div class="algorithm-title">仿射加密</div>
+                <div class="algorithm-desc">基于公式 f(x) = (ax + b) mod 26 的古典加密算法</div>
+                <div class="row">
+                    <div class="col">
+                        <div class="form-group">
+                            <label>参数 a</label>
+                            <input type="number" id="affine-key-a" value="5">
+                        </div>
+                        <div class="form-group">
+                            <label>参数 b</label>
+                            <input type="number" id="affine-key-b" value="8">
+                        </div>
+                        <div class="form-group">
+                            <label>输入文本</label>
+                            <textarea id="affine-input" placeholder="输入明文或密文"></textarea>
+                        </div>
+                        <button onclick="affineEncrypt()">加密</button>
+                        <button onclick="affineDecrypt()">解密</button>
+                    </div>
+                </div>
+            </div>
+            <div id="affine-result" class="result">
+                <div class="result-label">结果</div>
+                <div class="result-value" id="affine-output"></div>
+            </div>
+        </div>
+
+        <!-- 流密码 -->
+        <div id="stream" class="tab-content">
+            <div class="algorithm-card">
+                <div class="algorithm-title">流密码</div>
+                <div class="algorithm-desc">RC4 和 LFSR+J-K触发器 两种流密码实现</div>
+                
+                <div class="sub-tabs">
+                    <button class="sub-tab-btn active" onclick="showSubTab(event, 'rc4')">RC4</button>
+                    <button class="sub-tab-btn" onclick="showSubTab(event, 'lfsr')">LFSR+J-K</button>
+                </div>
+
+                <div id="rc4" class="sub-content">
+                    <div class="form-group">
+                        <label>种子密钥</label>
+                        <input type="text" id="rc4-key" placeholder="输入密钥">
+                    </div>
+                    <div class="form-group">
+                        <label>输入</label>
+                        <textarea id="rc4-input" placeholder="输入明文或密文(hex)"></textarea>
+                    </div>
+                    <button onclick="rc4Encrypt()">加密</button>
+                    <button onclick="rc4Decrypt()">解密</button>
+                    <div id="rc4-result" class="result">
+                        <div class="result-label">结果</div>
+                        <div class="result-value" id="rc4-output"></div>
+                    </div>
+                </div>
+
+                <div id="lfsr" class="sub-content" style="display:none;">
+                    <div class="form-group">
+                        <label>种子 (LFSR初始值)</label>
+                        <input type="text" id="lfsr-seed" placeholder="输入种子">
+                    </div>
+                    <div class="form-group">
+                        <label>输入</label>
+                        <textarea id="lfsr-input" placeholder="输入明文或密文(hex)"></textarea>
+                    </div>
+                    <button onclick="lfsrEncrypt()">加密</button>
+                    <button onclick="lfsrDecrypt()">解密</button>
+                    <div id="lfsr-result" class="result">
+                        <div class="result-label">结果</div>
+                        <div class="result-value" id="lfsr-output"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- DES对称加密 -->
+        <div id="des" class="tab-content">
+            <div class="algorithm-card">
+                <div class="algorithm-title">DES 对称加密</div>
+                <div class="algorithm-desc">数据加密标准 (Data Encryption Standard)</div>
+                <div class="form-group">
+                    <label>密钥</label>
+                    <input type="text" id="des-key" placeholder="输入8字节密钥">
+                </div>
+                <div class="form-group">
+                    <label>输入</label>
+                    <textarea id="des-input" placeholder="输入明文或密文(hex)"></textarea>
+                </div>
+                <button onclick="desEncrypt()">加密</button>
+                <button onclick="desDecrypt()">解密</button>
+            </div>
+            <div id="des-result" class="result">
+                <div class="result-label">结果</div>
+                <div class="result-value" id="des-output"></div>
+            </div>
+        </div>
+
+        <!-- RSA加密 -->
+        <div id="rsa" class="tab-content">
+            <div class="algorithm-card">
+                <div class="algorithm-title">RSA 非对称加密</div>
+                <div class="algorithm-desc">支持大于16bit的消息加密</div>
+                <div class="info-box">
+                    <strong>注意：</strong>RSA加密的消息长度受密钥大小限制。超过限制的消息请先使用对称加密，再用RSA加密对称密钥。
+                </div>
+                <button onclick="rsaGenerateKeys()">生成密钥对</button>
+            </div>
+            <div class="key-config">
+                <h4>密钥信息</h4>
+                <div class="form-group">
+                    <label>公钥</label>
+                    <textarea id="rsa-public-key" readonly></textarea>
+                </div>
+                <div class="form-group">
+                    <label>私钥</label>
+                    <textarea id="rsa-private-key" readonly></textarea>
+                </div>
+            </div>
+            <div class="algorithm-card">
+                <div class="form-group">
+                    <label>输入</label>
+                    <textarea id="rsa-input" placeholder="输入明文或密文(hex)"></textarea>
+                </div>
+                <button onclick="rsaEncrypt()">加密</button>
+                <button onclick="rsaDecrypt()">解密</button>
+            </div>
+            <div id="rsa-result" class="result">
+                <div class="result-label">结果</div>
+                <div class="result-value" id="rsa-output"></div>
+            </div>
+        </div>
+
+        <!-- D-H密钥交换 -->
+        <div id="dh" class="tab-content">
+            <div class="algorithm-card">
+                <div class="algorithm-title">D-H 密钥交换协议</div>
+                <div class="algorithm-desc">两个参与实体之间建立共享密钥的协议</div>
+                <div class="info-box">
+                    <strong>模拟场景：</strong>Alice和Bob通过D-H协议建立共享密钥
+                </div>
+                <button onclick="dhGenerateParams()" style="margin-bottom: 20px;">生成公共参数 (p, g)</button>
+            </div>
+            
+            <div class="row">
+                <div class="col">
+                    <div class="key-config">
+                        <h4>Alice (客户端)</h4>
+                        <button onclick="aliceGenerateKeys()">Alice生成密钥对</button>
+                        <div class="form-group">
+                            <label>p</label>
+                            <textarea id="dh-p-alice" readonly></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>g</label>
+                            <textarea id="dh-g-alice" readonly></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Alice公钥</label>
+                            <textarea id="dh-alice-pub" readonly></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Alice私钥</label>
+                            <textarea id="dh-alice-priv" readonly></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="key-config">
+                        <h4>Bob (服务端)</h4>
+                        <button onclick="bobGenerateKeys()">Bob生成密钥对</button>
+                        <div class="form-group">
+                            <label>p</label>
+                            <textarea id="dh-p-bob" readonly></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>g</label>
+                            <textarea id="dh-g-bob" readonly></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Bob公钥</label>
+                            <textarea id="dh-bob-pub" readonly></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Bob私钥</label>
+                            <textarea id="dh-bob-priv" readonly></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="key-config">
+                <h4>密钥交换与共享密钥</h4>
+                <div class="row">
+                    <div class="col">
+                        <button onclick="aliceComputeSecret()">Alice计算共享密钥</button>
+                        <div class="form-group">
+                            <label>Alice计算出的共享密钥</label>
+                            <textarea id="dh-alice-secret" readonly></textarea>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <button onclick="bobComputeSecret()">Bob计算共享密钥</button>
+                        <div class="form-group">
+                            <label>Bob计算出的共享密钥</label>
+                            <textarea id="dh-bob-secret" readonly></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div id="dh-verify" class="result">
+                    <div class="result-label">验证结果</div>
+                    <div class="result-value" id="dh-verify-output"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 散列函数 -->
+        <div id="hash" class="tab-content">
+            <div class="algorithm-card">
+                <div class="algorithm-title">散列函数</div>
+                <div class="algorithm-desc">SHA-1 和 MD5 散列算法</div>
+                
+                <div class="sub-tabs">
+                    <button class="sub-tab-btn active" onclick="showSubTab(event, 'sha1')">SHA-1</button>
+                    <button class="sub-tab-btn" onclick="showSubTab(event, 'md5')">MD5</button>
+                </div>
+                
+                <div id="sha1" class="sub-content">
+                    <div class="form-group">
+                        <label>输入</label>
+                        <textarea id="sha1-input" placeholder="输入消息"></textarea>
+                    </div>
+                    <button onclick="sha1Hash()">计算SHA-1</button>
+                    <div id="sha1-result" class="result">
+                        <div class="result-label">SHA-1 散列值</div>
+                        <div class="result-value" id="sha1-output"></div>
+                    </div>
+                </div>
+                
+                <div id="md5" class="sub-content" style="display:none;">
+                    <div class="form-group">
+                        <label>输入</label>
+                        <textarea id="md5-input" placeholder="输入消息"></textarea>
+                    </div>
+                    <button onclick="md5Hash()">计算MD5</button>
+                    <div id="md5-result" class="result">
+                        <div class="result-label">MD5 散列值</div>
+                        <div class="result-value" id="md5-output"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 数字签名 -->
+        <div id="signature" class="tab-content">
+            <div class="algorithm-card">
+                <div class="algorithm-title">RSA 数字签名</div>
+                <div class="algorithm-desc">消息完整性验证及来源验证</div>
+                
+                <div class="form-group">
+                    <label>消息</label>
+                    <textarea id="sig-message" placeholder="输入要签名的消息"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>私钥 (用于签名)</label>
+                    <textarea id="sig-private-key"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>签名结果</label>
+                    <textarea id="sig-signature" readonly></textarea>
+                </div>
+                <button onclick="signMessage()">签名</button>
+                
+                <hr>
+                
+                <div class="form-group">
+                    <label>公钥 (用于验证)</label>
+                    <textarea id="sig-public-key"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>签名 (要验证)</label>
+                    <textarea id="sig-verify-input"></textarea>
+                </div>
+                <button onclick="verifySignature()">验证签名</button>
+                
+                <div id="sig-result" class="result">
+                    <div class="result-label">验证结果</div>
+                    <div class="result-value" id="sig-verify-output"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Check Service Status
+        async function checkStatus() {
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+                const statusEl = document.getElementById('status');
+                if (data.crypto_available) {
+                    statusEl.textContent = 'C++加密库已加载';
+                    statusEl.className = 'status-ok';
+                } else {
+                    statusEl.textContent = 'C++加密库未加载';
+                    statusEl.className = 'status-error';
+                }
+            } catch (e) {
+                document.getElementById('status').textContent = '服务未启动';
+                document.getElementById('status').className = 'status-error';
+            }
+        }
+        checkStatus();
+
+        // JS logic
+        function showTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            event.currentTarget.classList.add('active');
+        }
+
+        function showSubTab(e, tabId) {
+            const parent = e.currentTarget.closest('.algorithm-card');
+            parent.querySelectorAll('.sub-content').forEach(el => el.style.display = 'none');
+            parent.querySelectorAll('.sub-tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabId).style.display = 'block';
+            e.currentTarget.classList.add('active');
+        }
+
+        async function apiCall(url, data) {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            return res.json();
+        }
+
+        function showResult(elementId, data, isError = false) {
+            const el = document.getElementById(elementId);
+            el.style.display = 'block';
+            el.className = isError ? 'result error' : 'result';
+            el.querySelector('.result-value').textContent = data.error || data.result || data[data.resultField] || JSON.stringify(data);
+        }
+
+        // Affine Cipher
+        async function affineEncrypt() {
+            const input = document.getElementById('affine-input').value;
+            const keyA = document.getElementById('affine-key-a').value;
+            const keyB = document.getElementById('affine-key-b').value;
+            const data = await apiCall('/api/affine/encrypt', {plaintext: input, key_a: keyA, key_b: keyB});
+            showResult('affine-result', {result: 'ciphertext' in data ? data.ciphertext : data.error || data, resultField: 'ciphertext'}, 'error' in data);
+            document.getElementById('affine-output').textContent = data.ciphertext || data.error;
+            document.getElementById('affine-result').style.display = 'block';
+        }
+
+        async function affineDecrypt() {
+            const input = document.getElementById('affine-input').value;
+            const keyA = document.getElementById('affine-key-a').value;
+            const keyB = document.getElementById('affine-key-b').value;
+            const data = await apiCall('/api/affine/decrypt', {ciphertext: input, key_a: keyA, key_b: keyB});
+            document.getElementById('affine-output').textContent = data.plaintext || data.error;
+            document.getElementById('affine-result').style.display = 'block';
+        }
+
+        // RC4
+        async function rc4Encrypt() {
+            const input = document.getElementById('rc4-input').value;
+            const key = document.getElementById('rc4-key').value;
+            const data = await apiCall('/api/rc4/encrypt', {plaintext: input, key: key});
+            document.getElementById('rc4-output').textContent = data.ciphertext || data.error;
+            document.getElementById('rc4-result').style.display = 'block';
+        }
+
+        async function rc4Decrypt() {
+            const input = document.getElementById('rc4-input').value;
+            const key = document.getElementById('rc4-key').value;
+            const data = await apiCall('/api/rc4/decrypt', {ciphertext: input, key: key});
+            document.getElementById('rc4-output').textContent = data.plaintext || data.error;
+            document.getElementById('rc4-result').style.display = 'block';
+        }
+
+        // LFSR
+        async function lfsrEncrypt() {
+            const input = document.getElementById('lfsr-input').value;
+            const seed = document.getElementById('lfsr-seed').value;
+            const data = await apiCall('/api/lfsr_jk/encrypt', {plaintext: input, seed: seed});
+            document.getElementById('lfsr-output').textContent = data.ciphertext || data.error;
+            document.getElementById('lfsr-result').style.display = 'block';
+        }
+
+        async function lfsrDecrypt() {
+            const input = document.getElementById('lfsr-input').value;
+            const seed = document.getElementById('lfsr-seed').value;
+            const data = await apiCall('/api/lfsr_jk/decrypt', {ciphertext: input, seed: seed});
+            document.getElementById('lfsr-output').textContent = data.plaintext || data.error;
+            document.getElementById('lfsr-result').style.display = 'block';
+        }
+
+        // DES
+        async function desEncrypt() {
+            const input = document.getElementById('des-input').value;
+            const key = document.getElementById('des-key').value;
+            const data = await apiCall('/api/des/encrypt', {plaintext: input, key: key});
+            document.getElementById('des-output').textContent = data.ciphertext || data.error;
+            document.getElementById('des-result').style.display = 'block';
+        }
+
+        async function desDecrypt() {
+            const input = document.getElementById('des-input').value;
+            const key = document.getElementById('des-key').value;
+            const data = await apiCall('/api/des/decrypt', {ciphertext: input, key: key});
+            document.getElementById('des-output').textContent = data.plaintext || data.error;
+            document.getElementById('des-result').style.display = 'block';
+        }
+
+        // RSA
+        async function rsaGenerateKeys() {
+            const data = await apiCall('/api/rsa/generate_keys', {});
+            document.getElementById('rsa-public-key').value = data.public_key || '';
+            document.getElementById('rsa-private-key').value = data.private_key || '';
+        }
+
+        async function rsaEncrypt() {
+            const input = document.getElementById('rsa-input').value;
+            const publicKey = document.getElementById('rsa-public-key').value;
+            const data = await apiCall('/api/rsa/encrypt', {plaintext: input, public_key: publicKey});
+            document.getElementById('rsa-output').textContent = data.ciphertext || data.error;
+            document.getElementById('rsa-result').style.display = 'block';
+        }
+
+        async function rsaDecrypt() {
+            const input = document.getElementById('rsa-input').value;
+            const privateKey = document.getElementById('rsa-private-key').value;
+            const data = await apiCall('/api/rsa/decrypt', {ciphertext: input, private_key: privateKey});
+            document.getElementById('rsa-output').textContent = data.plaintext || data.error;
+            document.getElementById('rsa-result').style.display = 'block';
+        }
+
+        // DH
+        let dhParams = {};
+        async function dhGenerateParams() {
+            const data = await apiCall('/api/dh/generate_params', {});
+            dhParams = data;
+            document.getElementById('dh-p-alice').value = data.p || '';
+            document.getElementById('dh-g-alice').value = data.g || '';
+            document.getElementById('dh-p-bob').value = data.p || '';
+            document.getElementById('dh-g-bob').value = data.g || '';
+        }
+
+        async function aliceGenerateKeys() {
+            const p = document.getElementById('dh-p-alice').value;
+            const g = document.getElementById('dh-g-alice').value;
+            if (!p || !g) { alert('请先生成公共参数'); return; }
+            const data = await apiCall('/api/dh/generate_keypair', {p, g});
+            document.getElementById('dh-alice-pub').value = data.public_key || '';
+            document.getElementById('dh-alice-priv').value = data.private_key || '';
+        }
+
+        async function bobGenerateKeys() {
+            const p = document.getElementById('dh-p-bob').value;
+            const g = document.getElementById('dh-g-bob').value;
+            if (!p || !g) { alert('请先生成公共参数'); return; }
+            const data = await apiCall('/api/dh/generate_keypair', {p, g});
+            document.getElementById('dh-bob-pub').value = data.public_key || '';
+            document.getElementById('dh-bob-priv').value = data.private_key || '';
+        }
+
+        async function aliceComputeSecret() {
+            const pubBob = document.getElementById('dh-bob-pub').value;
+            const privAlice = document.getElementById('dh-alice-priv').value;
+            const p = document.getElementById('dh-p-alice').value;
+            if (!pubBob || !privAlice || !p) { alert('请先生成参数和密钥对'); return; }
+            const data = await apiCall('/api/dh/compute_secret', {public_key: pubBob, private_key: privAlice, p});
+            document.getElementById('dh-alice-secret').value = data.shared_secret || '';
+            checkDhMatch();
+        }
+
+        async function bobComputeSecret() {
+            const pubAlice = document.getElementById('dh-alice-pub').value;
+            const privBob = document.getElementById('dh-bob-priv').value;
+            const p = document.getElementById('dh-p-bob').value;
+            if (!pubAlice || !privBob || !p) { alert('请先生成参数和密钥对'); return; }
+            const data = await apiCall('/api/dh/compute_secret', {public_key: pubAlice, private_key: privBob, p});
+            document.getElementById('dh-bob-secret').value = data.shared_secret || '';
+            checkDhMatch();
+        }
+
+        function checkDhMatch() {
+            const alice = document.getElementById('dh-alice-secret').value;
+            const bob = document.getElementById('dh-bob-secret').value;
+            if (alice && bob) {
+                const match = alice === bob;
+                document.getElementById('dh-verify').style.display = 'block';
+                document.getElementById('dh-verify-output').textContent = match ? '共享密钥匹配成功！' : '共享密钥不匹配';
+                document.getElementById('dh-verify').className = match ? 'result' : 'result error';
+            }
+        }
+
+        // SHA1
+        async function sha1Hash() {
+            const input = document.getElementById('sha1-input').value;
+            const data = await apiCall('/api/hash/sha1', {message: input});
+            document.getElementById('sha1-output').textContent = data.hash || data.error;
+            document.getElementById('sha1-result').style.display = 'block';
+        }
+
+        // MD5
+        async function md5Hash() {
+            const input = document.getElementById('md5-input').value;
+            const data = await apiCall('/api/hash/md5', {message: input});
+            document.getElementById('md5-output').textContent = data.hash || data.error;
+            document.getElementById('md5-result').style.display = 'block';
+        }
+
+        // Signature
+        async function signMessage() {
+            const message = document.getElementById('sig-message').value;
+            const privateKey = document.getElementById('sig-private-key').value;
+            if (!privateKey) { alert('请提供私钥'); return; }
+            const data = await apiCall('/api/rsa/sign', {message, private_key: privateKey});
+            document.getElementById('sig-signature').value = data.signature || '';
+        }
+
+        async function verifySignature() {
+            const message = document.getElementById('sig-message').value;
+            const signature = document.getElementById('sig-verify-input').value;
+            const publicKey = document.getElementById('sig-public-key').value;
+            if (!publicKey || !signature) { alert('请提供公钥和签名'); return; }
+            const data = await apiCall('/api/rsa/verify', {message, signature, public_key: publicKey});
+            document.getElementById('sig-result').style.display = 'block';
+            document.getElementById('sig-verify-output').textContent = data.valid ? '签名验证通过！' : '签名验证失败。';
+            document.getElementById('sig-result').className = data.valid ? 'result' : 'result error';
+        }
+
+        // --- AI Assistant Logic ---
+        const messageHistory = [];
+
+        function openAIAssistant() {
+            const modal = document.getElementById('aiModal');
+            modal.classList.add('open');
+            modal.setAttribute('aria-hidden', 'false');
+            document.getElementById('chatInput').focus();
+        }
+
+        function closeAIAssistant() {
+            const modal = document.getElementById('aiModal');
+            modal.classList.remove('open');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+
+        window.addEventListener('click', (event) => {
+            const modal = document.getElementById('aiModal');
+            if (event.target === modal) {
+                closeAIAssistant();
+            }
+        });
+
+        window.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                closeAIAssistant();
+            }
+        });
+
+        function escapeHtml(text) {
+            return text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        async function appendChatMessage(role, text, isError=false) {
+            const historyEl = document.getElementById('chatHistory');
+            const safeText = escapeHtml(text).replace(/\n/g, '<br>');
+            const className = role === 'user' ? 'user' : 'ai';
+
+            const messageEl = document.createElement('div');
+            messageEl.className = `chat-msg ${className}`;
+            if (isError) {
+                messageEl.style.background = '#ff5b5b';
+            }
+            messageEl.innerHTML = safeText;
+            historyEl.appendChild(messageEl);
+
+            if (role === 'ai' && window.MathJax && window.MathJax.typesetPromise) {
+                try {
+                    await window.MathJax.typesetPromise([messageEl]);
+                } catch (e) {
+                    console.error('MathJax render failed:', e);
+                }
+            }
+
+            historyEl.scrollTop = historyEl.scrollHeight;
+        }
+
+        function handleChatEnter(e) {
+            if (e.key === 'Enter') {
+                sendChatMessage();
+            }
+        }
+
+        async function sendChatMessage() {
+            const inputEl = document.getElementById('chatInput');
+
+            const userText = inputEl.value.trim();
+            if(!userText) return;
+
+            // Render user msg
+            await appendChatMessage('user', userText);
+            inputEl.value = '';
+
+            messageHistory.push({
+                role: 'user',
+                name: '用户',
+                content: userText
+            });
+
+            try {
+                const response = await fetch('/api/assistant', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        messages: messageHistory
+                    })
+                });
+                const data = await response.json();
+                if(data.error) {
+                    await appendChatMessage('ai', `错误: ${data.error}`, true);
+                } else if(data.reply) {
+                    await appendChatMessage('ai', data.reply);
+                    messageHistory.push({
+                        role: 'assistant',
+                        name: 'Assistant',
+                        content: data.reply
+                    });
+                }
+            } catch (err) {
+                await appendChatMessage('ai', `请求失败: ${err.message}`, true);
+            }
+        }
+    </script>
+</body>
+</html>

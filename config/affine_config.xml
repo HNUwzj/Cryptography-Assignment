@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<AffineConfig>
+    <description>仿射加密配置文件</description>
+    <algorithm>f(x) = (a*x + b) mod 26</algorithm>
+    <parameters>
+        <key_a>5</key_a>
+        <key_b>8</key_b>
+    </parameters>
+    <valid_keys>
+        <a_values>1,3,5,7,9,11,15,17,19,21,23,25</a_values>
+        <b_range>0-25</b_range>
+    </valid_keys>
+</AffineConfig>

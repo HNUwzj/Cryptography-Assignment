@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RSAConfig>
+    <description>RSA非对称加密配置文件</description>
+    <algorithm>RSA</algorithm>
+
+    <key_generation>
+        <bits>1024</bits>
+        <public_exponent>65537</public_exponent>
+    </key_generation>
+
+    <limits>
+        <max_message_length>117 bytes (for 1024-bit key)</max_message_length>
+        <note>消息长度受密钥大小限制，超过限制请使用混合加密</note>
+    </limits>
+
+    <signature>
+        <hash_algorithm>SHA-256</hash_algorithm>
+    </signature>
+</RSAConfig>

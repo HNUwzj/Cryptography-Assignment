@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<StreamCipherConfig>
+    <description>流密码配置文件</description>
+
+    <RC4>
+        <key_length>variable</key_length>
+        <description>RC4流密码</description>
+    </RC4>
+
+    <LFSR_JK>
+        <description>LFSR + J-K触发器流密码</description>
+        <register_size>16</register_size>
+        <feedback_polynomial>x^16 + x^14 + x^13 + x^11</feedback_polynomial>
+    </LFSR_JK>
+
+    <example>
+        <seed>mysecretseed12345</seed>
+    </example>
+</StreamCipherConfig>

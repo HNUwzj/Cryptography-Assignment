@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<DESConfig>
+    <description>DES对称加密配置文件</description>
+    <algorithm>Data Encryption Standard</algorithm>
+    <key_length>8 bytes (56 bits + 8 parity)</key_length>
+    <block_size>8 bytes</block_size>
+    <mode>ECB (Electronic Codebook)</mode>
+
+    <parameters>
+        <key>my8bytek</key>
+    </parameters>
+
+    <example>
+        <plaintext>HelloWorld</plaintext>
+        <key>secretke</key>
+    </example>
+</DESConfig>
