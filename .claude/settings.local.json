@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(find ~ -maxdepth 3 -type d \\\\\\(-iname *c++* -o -iname *cpp* -o -iname *c_plus_plus* \\\\\\))",
-      "Bash(find ~ -maxdepth 3 -type d \\\\\\(-iname *codec++* -o -iname *code* \\\\\\))"
-    ]
-  }
-}
