@@ -441,7 +441,6 @@
             <button class="tab-btn" onclick="showTab('des')">DES 对称加密</button>
             <button class="tab-btn" onclick="showTab('rsa')">RSA 非对称加密</button>
             <button class="tab-btn" onclick="showTab('dh')">D-H 密钥交换</button>
-            <button class="tab-btn" onclick="showTab('filetransfer')">大文件安全传输</button>
             <button class="tab-btn" onclick="showTab('hash')">散列函数</button>
             <button class="tab-btn" onclick="showTab('signature')">数字签名</button>
         </div>
@@ -721,20 +720,6 @@
         </div>
 
         <!-- 散列函数 -->
-        <div id="filetransfer" class="tab-content">
-            <div class="algorithm-card">
-                <div class="algorithm-title">增强 D-H 大文件安全传输</div>
-                <div class="algorithm-desc">服务端提供分块上传接口，客户端脚本按块加密传输，支持 1G 以上文件</div>
-                <div class="info-box">
-                    C/S 演示命令：先启动 Flask 服务，再运行 python client.py --file path\to\large_file.bin
-                </div>
-                <div class="form-group">
-                    <label>协议增强点</label>
-                    <textarea readonly>D-H 协商会话密钥；RSA 签名验证 D-H 公钥来源；每个文件块使用 HMAC-SHA256 验证完整性；文件流式分块加密传输，不把整文件读入内存。</textarea>
-                </div>
-            </div>
-        </div>
-
         <div id="hash" class="tab-content">
             <div class="algorithm-card">
                 <div class="algorithm-title">散列函数</div>
