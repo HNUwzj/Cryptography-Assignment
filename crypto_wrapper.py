@@ -117,14 +117,14 @@ def rc4_encrypt(plaintext: bytes) -> bytes:
         raise RuntimeError("Crypto DLL not loaded")
     output = ctypes.create_string_buffer(len(plaintext) + 1)
     lib.rc4_encrypt(plaintext, len(plaintext), output)
-    return output.value
+    return output.raw[:len(plaintext)]
 
 def rc4_decrypt(ciphertext: bytes) -> bytes:
     if lib is None:
         raise RuntimeError("Crypto DLL not loaded")
     output = ctypes.create_string_buffer(len(ciphertext) + 1)
     lib.rc4_decrypt(ciphertext, len(ciphertext), output)
-    return output.value
+    return output.raw[:len(ciphertext)]
 
 # ==================== LFSR + J-K触发器 ====================
 def lfsr_jk_init(seed: bytes):
@@ -137,14 +137,14 @@ def lfsr_jk_encrypt(plaintext: bytes) -> bytes:
         raise RuntimeError("Crypto DLL not loaded")
     output = ctypes.create_string_buffer(len(plaintext) + 1)
     lib.lfsr_jk_encrypt(plaintext, len(plaintext), output)
-    return output.value
+    return output.raw[:len(plaintext)]
 
 def lfsr_jk_decrypt(ciphertext: bytes) -> bytes:
     if lib is None:
         raise RuntimeError("Crypto DLL not loaded")
     output = ctypes.create_string_buffer(len(ciphertext) + 1)
     lib.lfsr_jk_decrypt(ciphertext, len(ciphertext), output)
-    return output.value
+    return output.raw[:len(ciphertext)]
 
 # ==================== DES 对称加密 ====================
 def des_encrypt(plaintext: str, key: str) -> str:
