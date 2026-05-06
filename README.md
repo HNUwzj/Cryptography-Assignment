@@ -234,6 +234,38 @@ Remove-Item received_files\xxxx_test_1g.bin
 
 这些功能既可以在 Web 页面单独演示，也用于 D-H 增强认证协议。
 
+## XML 密钥配置说明
+
+本系统支持通过 XML 文件配置默认密钥。Web 页面中的密钥输入框可以手动填写；如果对应输入框留空，后端会自动读取 XML 文件中的默认值。
+
+| 功能 | XML 文件 | XML 默认值 | 界面留空时行为 |
+|---|---|---|---|
+| 仿射加密 | `config/affine_config.xml` | `key_a = 5`, `key_b = 8` | 参数 `a`、`b` 留空时使用 XML 中的 `key_a`、`key_b` |
+| RC4 流密码 | `config/stream_config.xml` | `seed = mysecretseed12345` | 密钥输入框留空时使用 XML 中的 `seed` 作为 RC4 密钥 |
+| LFSR + J-K 流密码 | `config/stream_config.xml` | `seed = mysecretseed12345` | 种子输入框留空时使用 XML 中的 `seed` |
+| DES 对称加密 | `config/des_config.xml` | `key = my8bytek` | 密钥输入框留空时使用 XML 中的 `key` |
+
+例如仿射加密页面中，参数 `a`、`b` 都留空，输入明文：
+
+```text
+abc
+```
+
+后端会读取 `config/affine_config.xml` 中的：
+
+```xml
+<key_a>5</key_a>
+<key_b>8</key_b>
+```
+
+因此加密结果为：
+
+```text
+ins
+```
+
+注意：仿射加密实现只处理英文字母 `A-Z` 和 `a-z`，数字、标点和空格会原样保留。例如输入 `4545`，结果仍然是 `4545`，这并不表示 XML 配置未生效。
+
 ## 项目结构
 
 ```text
