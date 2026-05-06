@@ -11,6 +11,11 @@ extern "C" {
     CRYPTO_API void affine_encrypt(const char* plaintext, const char* key_a, const char* key_b, char* output);
     CRYPTO_API void affine_decrypt(const char* ciphertext, const char* key_a, const char* key_b, char* output);
 
+    // 128-bit big integer arithmetic
+    CRYPTO_API void bigint128_add(const char* left, const char* right, char* output);
+    CRYPTO_API void bigint128_sub(const char* left, const char* right, char* output);
+    CRYPTO_API void bigint128_mul(const char* left, const char* right, char* output);
+
     // 流密码 - RC4
     CRYPTO_API void rc4_init(const char* key, int key_len);
     CRYPTO_API void rc4_encrypt(const char* input, int len, char* output);

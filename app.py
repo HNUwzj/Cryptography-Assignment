@@ -4,6 +4,10 @@
 from flask import Flask, render_template, request, jsonify, session
 import os
 import sys
+import hashlib
+import hmac
+import uuid
+from pathlib import Path
 
 # 添加当前目录到路径
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -17,6 +21,7 @@ try:
     import crypto_wrapper as _crypto_wrapper
     from crypto_wrapper import (
         affine_encrypt, affine_decrypt,
+        bigint128_add, bigint128_sub, bigint128_mul,
         rc4_init, rc4_encrypt, rc4_decrypt,
         lfsr_jk_init, lfsr_jk_encrypt, lfsr_jk_decrypt,
         des_encrypt, des_decrypt,
@@ -67,6 +72,29 @@ def api_affine_decrypt():
         return jsonify({'error': str(e)}), 500
 
 # ==================== RC4 流密码 ====================
+@app.route('/api/bigint/calc', methods=['POST'])
+def api_bigint_calc():
+    data = request.json
+    left = data.get('left', '0')
+    right = data.get('right', '0')
+    op = data.get('op', 'add')
+
+    if not crypto_available:
+        return jsonify({'error': 'Crypto library not loaded'}), 500
+
+    try:
+        if op == 'add':
+            result = bigint128_add(left, right)
+        elif op == 'sub':
+            result = bigint128_sub(left, right)
+        elif op == 'mul':
+            result = bigint128_mul(left, right)
+        else:
+            return jsonify({'error': 'Unsupported operation'}), 400
+        return jsonify({'result': result})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/rc4/encrypt', methods=['POST'])
 def api_rc4_encrypt():
     data = request.json
@@ -343,6 +371,127 @@ def api_dh_auth_exchange():
         return jsonify({'error': str(e)}), 500
 
 # ==================== 散列函数 ====================
+file_sessions = {}
+UPLOAD_DIR = Path(app.root_path) / 'received_files'
+CHUNK_SIZE = 1024 * 1024
+
+def _session_key(shared_secret):
+    return hashlib.sha256(shared_secret.encode()).digest()
+
+def _xor_stream(data, key, chunk_index):
+    out = bytearray(len(data))
+    offset = 0
+    counter = 0
+    while offset < len(data):
+        seed = key + chunk_index.to_bytes(8, 'big') + counter.to_bytes(8, 'big')
+        block = hashlib.sha256(seed).digest()
+        take = min(len(block), len(data) - offset)
+        for i in range(take):
+            out[offset + i] = data[offset + i] ^ block[i]
+        offset += take
+        counter += 1
+    return bytes(out)
+
+@app.route('/api/secure_file/init', methods=['POST'])
+def api_secure_file_init():
+    if not crypto_available:
+        return jsonify({'error': 'Crypto library not loaded'}), 500
+
+    data = request.json
+    client_dh_pub = data.get('client_dh_pub', '')
+    client_rsa_pub = data.get('client_rsa_pub', '')
+    signature = data.get('signature', '')
+    filename = os.path.basename(data.get('filename', 'upload.bin'))
+    expected_size = int(data.get('size', 0))
+
+    try:
+        client_hash = md5_hash(client_dh_pub)
+        if not rsa_verify(client_hash, signature, client_rsa_pub):
+            return jsonify({'error': 'Signature verification failed'}), 403
+
+        p, g = dh_generate_params()
+        server_dh_pub, server_dh_priv = dh_generate_keypair(p, g)
+
+        if not server_rsa_keys:
+            spub, spriv = rsa_generate_keys(1024)
+            server_rsa_keys['pub'] = spub
+            server_rsa_keys['priv'] = spriv
+
+        shared_secret = dh_compute_shared_secret(client_dh_pub, server_dh_priv, p)
+        session_id = uuid.uuid4().hex
+        UPLOAD_DIR.mkdir(exist_ok=True)
+        output_path = UPLOAD_DIR / f"{session_id}_{filename}"
+        file_sessions[session_id] = {
+            'key': _session_key(shared_secret),
+            'path': output_path,
+            'size': expected_size,
+            'received': 0,
+            'sha1': hashlib.sha1(),
+            'source': client_rsa_pub,
+        }
+
+        server_hash = md5_hash(server_dh_pub)
+        server_sig = rsa_sign(server_hash, server_rsa_keys['priv'])
+        return jsonify({
+            'session_id': session_id,
+            'server_dh_pub': server_dh_pub,
+            'server_rsa_pub': server_rsa_keys['pub'],
+            'signature': server_sig,
+            'p': p,
+            'g': g,
+            'chunk_size': CHUNK_SIZE,
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/secure_file/chunk', methods=['POST'])
+def api_secure_file_chunk():
+    session_id = request.headers.get('X-Session-Id', '')
+    chunk_index = int(request.headers.get('X-Chunk-Index', '0'))
+    chunk_mac = request.headers.get('X-Chunk-Mac', '')
+    session_info = file_sessions.get(session_id)
+    if not session_info:
+        return jsonify({'error': 'Invalid upload session'}), 404
+
+    encrypted = request.get_data()
+    expected_mac = hmac.new(
+        session_info['key'],
+        chunk_index.to_bytes(8, 'big') + encrypted,
+        hashlib.sha256
+    ).hexdigest()
+    if not hmac.compare_digest(chunk_mac, expected_mac):
+        return jsonify({'error': 'Chunk integrity check failed'}), 400
+
+    plaintext = _xor_stream(encrypted, session_info['key'], chunk_index)
+    with open(session_info['path'], 'ab') as f:
+        f.write(plaintext)
+    session_info['sha1'].update(plaintext)
+    session_info['received'] += len(plaintext)
+    return jsonify({'received': session_info['received']})
+
+@app.route('/api/secure_file/finish', methods=['POST'])
+def api_secure_file_finish():
+    data = request.json
+    session_id = data.get('session_id', '')
+    client_sha1 = data.get('sha1', '')
+    session_info = file_sessions.get(session_id)
+    if not session_info:
+        return jsonify({'error': 'Invalid upload session'}), 404
+
+    server_sha1 = session_info['sha1'].hexdigest()
+    size_ok = not session_info['size'] or session_info['received'] == session_info['size']
+    hash_ok = hmac.compare_digest(server_sha1, client_sha1)
+    if not size_ok or not hash_ok:
+        return jsonify({
+            'error': 'Final file verification failed',
+            'server_sha1': server_sha1,
+            'received': session_info['received'],
+        }), 400
+
+    path = str(session_info['path'])
+    file_sessions.pop(session_id, None)
+    return jsonify({'status': 'ok', 'saved_path': path, 'sha1': server_sha1})
+
 @app.route('/api/hash/sha1', methods=['POST'])
 def api_hash_sha1():
     data = request.json

@@ -3,6 +3,8 @@
 #include <cstring>
 #include <vector>
 #include <string>
+#include <algorithm>
+#include <cctype>
 #include <openssl/bn.h>
 #include <openssl/sha.h>
 #include <openssl/md5.h>
@@ -25,6 +27,159 @@ static int modInverse(int a, int m) {
 }
 
 // ==================== 仿射加密 ====================
+// ==================== 128-bit big integer arithmetic ====================
+class UInt128 {
+public:
+    unsigned int limb[4];
+
+    UInt128() { memset(limb, 0, sizeof(limb)); }
+
+    static UInt128 fromString(const char* text) {
+        UInt128 value;
+        if (!text) return value;
+        while (*text && isspace((unsigned char)*text)) ++text;
+
+        bool hex = text[0] == '0' && (text[1] == 'x' || text[1] == 'X');
+        if (hex) {
+            text += 2;
+            while (*text) {
+                int digit = 0;
+                if (*text >= '0' && *text <= '9') digit = *text - '0';
+                else if (*text >= 'a' && *text <= 'f') digit = *text - 'a' + 10;
+                else if (*text >= 'A' && *text <= 'F') digit = *text - 'A' + 10;
+                else { ++text; continue; }
+                value.mulSmall(16);
+                value.addSmall((unsigned int)digit);
+                ++text;
+            }
+        } else {
+            while (*text) {
+                if (*text >= '0' && *text <= '9') {
+                    value.mulSmall(10);
+                    value.addSmall((unsigned int)(*text - '0'));
+                }
+                ++text;
+            }
+        }
+        return value;
+    }
+
+    void addSmall(unsigned int x) {
+        unsigned long long carry = x;
+        for (int i = 0; i < 4 && carry; ++i) {
+            unsigned long long sum = (unsigned long long)limb[i] + carry;
+            limb[i] = (unsigned int)sum;
+            carry = sum >> 32;
+        }
+    }
+
+    void mulSmall(unsigned int x) {
+        unsigned long long carry = 0;
+        for (int i = 0; i < 4; ++i) {
+            unsigned long long product = (unsigned long long)limb[i] * x + carry;
+            limb[i] = (unsigned int)product;
+            carry = product >> 32;
+        }
+    }
+
+    int compare(const UInt128& other) const {
+        for (int i = 3; i >= 0; --i) {
+            if (limb[i] < other.limb[i]) return -1;
+            if (limb[i] > other.limb[i]) return 1;
+        }
+        return 0;
+    }
+};
+
+static bool isZero256(const unsigned int v[8]) {
+    for (int i = 0; i < 8; ++i) if (v[i]) return false;
+    return true;
+}
+
+static unsigned int divSmall256(unsigned int v[8], unsigned int divisor) {
+    unsigned long long rem = 0;
+    for (int i = 7; i >= 0; --i) {
+        unsigned long long cur = (rem << 32) | v[i];
+        v[i] = (unsigned int)(cur / divisor);
+        rem = cur % divisor;
+    }
+    return (unsigned int)rem;
+}
+
+static std::string toDecimal256(const unsigned int input[8]) {
+    unsigned int temp[8];
+    memcpy(temp, input, sizeof(temp));
+    if (isZero256(temp)) return "0";
+
+    std::string digits;
+    while (!isZero256(temp)) {
+        digits.push_back((char)('0' + divSmall256(temp, 10)));
+    }
+    std::reverse(digits.begin(), digits.end());
+    return digits;
+}
+
+CRYPTO_API void bigint128_add(const char* left, const char* right, char* output) {
+    UInt128 a = UInt128::fromString(left);
+    UInt128 b = UInt128::fromString(right);
+    unsigned int result[8] = {0};
+    unsigned long long carry = 0;
+    for (int i = 0; i < 4; ++i) {
+        unsigned long long sum = (unsigned long long)a.limb[i] + b.limb[i] + carry;
+        result[i] = (unsigned int)sum;
+        carry = sum >> 32;
+    }
+    result[4] = (unsigned int)carry;
+    strcpy(output, toDecimal256(result).c_str());
+}
+
+CRYPTO_API void bigint128_sub(const char* left, const char* right, char* output) {
+    UInt128 a = UInt128::fromString(left);
+    UInt128 b = UInt128::fromString(right);
+    bool negative = a.compare(b) < 0;
+    const UInt128& hi = negative ? b : a;
+    const UInt128& lo = negative ? a : b;
+    unsigned int result[8] = {0};
+    long long borrow = 0;
+    for (int i = 0; i < 4; ++i) {
+        long long diff = (long long)hi.limb[i] - lo.limb[i] - borrow;
+        if (diff < 0) {
+            diff += (1LL << 32);
+            borrow = 1;
+        } else {
+            borrow = 0;
+        }
+        result[i] = (unsigned int)diff;
+    }
+    std::string text = toDecimal256(result);
+    if (negative && text != "0") text.insert(text.begin(), '-');
+    strcpy(output, text.c_str());
+}
+
+CRYPTO_API void bigint128_mul(const char* left, const char* right, char* output) {
+    UInt128 a = UInt128::fromString(left);
+    UInt128 b = UInt128::fromString(right);
+    unsigned int result[8] = {0};
+
+    for (int i = 0; i < 4; ++i) {
+        unsigned long long carry = 0;
+        for (int j = 0; j < 4; ++j) {
+            unsigned long long cur = (unsigned long long)a.limb[i] * b.limb[j] + result[i + j] + carry;
+            result[i + j] = (unsigned int)cur;
+            carry = cur >> 32;
+        }
+        int k = i + 4;
+        while (carry && k < 8) {
+            unsigned long long cur = (unsigned long long)result[k] + carry;
+            result[k] = (unsigned int)cur;
+            carry = cur >> 32;
+            ++k;
+        }
+    }
+
+    strcpy(output, toDecimal256(result).c_str());
+}
+
 CRYPTO_API void affine_encrypt(const char* plaintext, const char* key_a, const char* key_b, char* output) {
     int a = atoi(key_a);
     int b = atoi(key_b);

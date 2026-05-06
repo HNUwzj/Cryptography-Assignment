@@ -436,10 +436,12 @@
         <div class="logo">Crypto<span>Dash</span></div>
         <div class="nav-menu">
             <button class="tab-btn active" onclick="showTab('affine')">仿射加密</button>
+            <button class="tab-btn" onclick="showTab('bigint')">128位大整数</button>
             <button class="tab-btn" onclick="showTab('stream')">流密码</button>
             <button class="tab-btn" onclick="showTab('des')">DES 对称加密</button>
             <button class="tab-btn" onclick="showTab('rsa')">RSA 非对称加密</button>
             <button class="tab-btn" onclick="showTab('dh')">D-H 密钥交换</button>
+            <button class="tab-btn" onclick="showTab('filetransfer')">大文件安全传输</button>
             <button class="tab-btn" onclick="showTab('hash')">散列函数</button>
             <button class="tab-btn" onclick="showTab('signature')">数字签名</button>
         </div>
@@ -508,6 +510,34 @@
         </div>
 
         <!-- 流密码 -->
+        <div id="bigint" class="tab-content">
+            <div class="algorithm-card">
+                <div class="algorithm-title">128位大整数运算</div>
+                <div class="algorithm-desc">自建 UInt128 类，支持十进制或 0x 开头的十六进制输入，加、减、乘结果以十进制输出</div>
+                <div class="row">
+                    <div class="col">
+                        <div class="form-group">
+                            <label>整数 A</label>
+                            <input type="text" id="bigint-left" value="340282366920938463463374607431768211455">
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="form-group">
+                            <label>整数 B</label>
+                            <input type="text" id="bigint-right" value="123456789">
+                        </div>
+                    </div>
+                </div>
+                <button onclick="bigintCalc('add')">加法</button>
+                <button onclick="bigintCalc('sub')">减法</button>
+                <button onclick="bigintCalc('mul')">乘法</button>
+            </div>
+            <div id="bigint-result" class="result">
+                <div class="result-label">结果</div>
+                <div class="result-value" id="bigint-output"></div>
+            </div>
+        </div>
+
         <div id="stream" class="tab-content">
             <div class="algorithm-card">
                 <div class="algorithm-title">流密码</div>
@@ -694,6 +724,20 @@
         </div>
 
         <!-- 散列函数 -->
+        <div id="filetransfer" class="tab-content">
+            <div class="algorithm-card">
+                <div class="algorithm-title">增强 D-H 大文件安全传输</div>
+                <div class="algorithm-desc">服务端提供分块上传接口，客户端脚本按块加密传输，支持 1G 以上文件</div>
+                <div class="info-box">
+                    C/S 演示命令：先启动 Flask 服务，再运行 python secure_file_client.py path\to\large_file.bin
+                </div>
+                <div class="form-group">
+                    <label>协议增强点</label>
+                    <textarea readonly>D-H 协商会话密钥；RSA 签名验证 D-H 公钥来源；每个文件块使用 HMAC-SHA256 验证完整性；文件流式分块加密传输，不把整文件读入内存。</textarea>
+                </div>
+            </div>
+        </div>
+
         <div id="hash" class="tab-content">
             <div class="algorithm-card">
                 <div class="algorithm-title">散列函数</div>
@@ -841,6 +885,14 @@
             const data = await apiCall('/api/affine/decrypt', {ciphertext: input, key_a: keyA, key_b: keyB});
             document.getElementById('affine-output').textContent = data.plaintext || data.error;
             document.getElementById('affine-result').style.display = 'block';
+        }
+
+        async function bigintCalc(op) {
+            const left = document.getElementById('bigint-left').value;
+            const right = document.getElementById('bigint-right').value;
+            const data = await apiCall('/api/bigint/calc', {left, right, op});
+            document.getElementById('bigint-output').textContent = data.result || data.error;
+            document.getElementById('bigint-result').style.display = 'block';
         }
 
         // RC4

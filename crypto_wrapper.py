@@ -86,6 +86,27 @@ def affine_decrypt(ciphertext: str, key_a: int, key_b: int) -> str:
     return output.value.decode()
 
 # ==================== RC4 流密码 ====================
+def bigint128_add(left: str, right: str) -> str:
+    if lib is None:
+        raise RuntimeError("Crypto DLL not loaded")
+    output = ctypes.create_string_buffer(128)
+    lib.bigint128_add(str(left).encode(), str(right).encode(), output)
+    return output.value.decode()
+
+def bigint128_sub(left: str, right: str) -> str:
+    if lib is None:
+        raise RuntimeError("Crypto DLL not loaded")
+    output = ctypes.create_string_buffer(128)
+    lib.bigint128_sub(str(left).encode(), str(right).encode(), output)
+    return output.value.decode()
+
+def bigint128_mul(left: str, right: str) -> str:
+    if lib is None:
+        raise RuntimeError("Crypto DLL not loaded")
+    output = ctypes.create_string_buffer(128)
+    lib.bigint128_mul(str(left).encode(), str(right).encode(), output)
+    return output.value.decode()
+
 def rc4_init(key: bytes):
     if lib is None:
         raise RuntimeError("Crypto DLL not loaded")
