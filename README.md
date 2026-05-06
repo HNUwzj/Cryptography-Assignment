@@ -156,18 +156,71 @@ python client.py
 - 文件按 1MB 分块读取、加密、发送
 - 不会一次性把整个文件加载到内存，支持 1G 以上文件
 
-上传文件：
+完整 1G+ 测试流程如下。
+
+第一步，启动 Flask 服务端：
 
 ```bash
 python app.py
-python client.py --file D:\path\to\large_file.bin
 ```
 
-生成 1G 以上测试文件并上传：
+第二步，生成 1G 以上测试文件。下面命令会创建一个约 1.1GB 的稀疏测试文件：
 
 ```bash
 python client.py --make-test-file test_1g.bin --size-gb 1.1
+```
+
+第三步，确认测试文件大小：
+
+```powershell
+(Get-Item test_1g.bin).Length
+```
+
+输出应约为：
+
+```text
+1181116006
+```
+
+第四步，执行安全加密传输：
+
+```bash
 python client.py --file test_1g.bin
+```
+
+客户端会按 1MB 分块输出发送进度，例如：
+
+```text
+sent 1048576/1181116006 bytes
+...
+sent 1181116006/1181116006 bytes
+=== 大文件安全传输完成 ===
+保存路径: D:\密码学实验\Cryptography-Assignment\received_files\xxxx_test_1g.bin
+SHA-1: 27d89fefa2cd62def47d8c3b3c3818701a4d66fc
+```
+
+第五步，检查服务端接收文件大小。将下面命令里的文件名替换为客户端输出的实际保存文件名：
+
+```powershell
+(Get-Item received_files\xxxx_test_1g.bin).Length
+```
+
+该值应与原始 `test_1g.bin` 完全一致。
+
+第六步，对比原始文件和接收文件的 SHA-1：
+
+```powershell
+Get-FileHash test_1g.bin -Algorithm SHA1
+Get-FileHash received_files\xxxx_test_1g.bin -Algorithm SHA1
+```
+
+两个 SHA-1 值完全一致，即可证明 1G 以上文件已经完成分块加密传输、服务端接收、解密和完整性验证。
+
+测试完成后可清理测试文件：
+
+```powershell
+Remove-Item test_1g.bin
+Remove-Item received_files\xxxx_test_1g.bin
 ```
 
 ### 9. 散列函数与数字签名
@@ -272,4 +325,3 @@ python client.py --file D:\path\to\large_file.bin
 - requests
 - OpenSSL
 - MinGW 或 Visual Studio C++ 编译工具
-
