@@ -133,10 +133,10 @@ python app.py
 再运行客户端脚本上传文件：
 
 ```bash
-python secure_file_client.py D:\path\to\large_file.bin
+python client.py --file D:\path\to\large_file.bin
 ```
 
-协议流程包括：客户端 RSA 身份签名、D-H 会话密钥协商、服务端 RSA 签名返回、每个文件块 HMAC-SHA256 完整性验证、分块流式加密传输。客户端按块读取文件，适合 1G 以上容量文件，不会一次性加载整个文件。
+协议流程包括：客户端 RSA 身份签名、客户端提交同一组 D-H 参数 `p,g`、D-H 会话密钥协商、服务端 RSA 签名返回、每个文件块 HMAC-SHA256 完整性验证、分块流式加密传输。客户端按块读取文件，适合 1G 以上容量文件，不会一次性加载整个文件。
 
 ## 依赖
 

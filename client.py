@@ -2,6 +2,7 @@ import requests
 import json
 import os
 import sys
+import argparse
 
 # 尝试导入我们自己本地打包的加密库，因为客户端也要做本地的密码学计算
 try:
@@ -16,7 +17,21 @@ except ImportError as e:
 
 BASE_URL = "http://127.0.0.1:5000/api"
 
+def upload_large_file(path):
+    from secure_file_client import upload_file
+    result = upload_file(path, BASE_URL)
+    print("=== Large file secure transfer completed ===")
+    print(f"saved_path: {result['saved_path']}")
+    print(f"sha1: {result['sha1']}")
+
 def main():
+    parser = argparse.ArgumentParser(description="D-H authenticated communication client")
+    parser.add_argument("--file", help="upload a large file with authenticated encrypted chunk transfer")
+    args = parser.parse_args()
+    if args.file:
+        upload_large_file(args.file)
+        return
+
     print("=" * 60)
     print(" 增强型 D-H 认证协议客户端 (Anti-MitM) 测试与通信演示 ")
     print("=" * 60)
@@ -49,7 +64,9 @@ def main():
     payload = {
         'client_dh_pub': c_dh_pub,
         'client_rsa_pub': c_rsa_pub,
-        'signature': c_sig
+        'signature': c_sig,
+        'p': p,
+        'g': g
     }
 
     # 5. 发送至服务端

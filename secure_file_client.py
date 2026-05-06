@@ -54,6 +54,8 @@ def upload_file(path, base_url=BASE_URL):
         "client_dh_pub": client_dh_pub,
         "client_rsa_pub": client_rsa_pub,
         "signature": signature,
+        "p": p,
+        "g": g,
         "filename": source.name,
         "size": source.stat().st_size,
     }

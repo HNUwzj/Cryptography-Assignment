@@ -331,6 +331,10 @@ def api_dh_auth_exchange():
     client_dh_pub = data.get('client_dh_pub')
     client_rsa_pub = data.get('client_rsa_pub')
     signature = data.get('signature')
+    p = data.get('p')
+    g = data.get('g')
+    if not client_dh_pub or not client_rsa_pub or not signature or not p or not g:
+        return jsonify({'error': 'Missing D-H parameters or authentication fields'}), 400
     
     try:
         # 1. 验证客户端来源与完整性
@@ -342,7 +346,6 @@ def api_dh_auth_exchange():
             return jsonify({'error': 'Signature verification failed! Possible Man-in-the-Middle attack.'}), 403
             
         # 2. 服务端生成自己的 D-H 密钥对 
-        p, g = dh_generate_params()
         server_dh_pub, server_dh_priv = dh_generate_keypair(p, g)
         
         # 3. 服务端配置自己的 RSA 身份 (如果还没有)
@@ -401,15 +404,19 @@ def api_secure_file_init():
     client_dh_pub = data.get('client_dh_pub', '')
     client_rsa_pub = data.get('client_rsa_pub', '')
     signature = data.get('signature', '')
+    p = data.get('p', '')
+    g = data.get('g', '')
     filename = os.path.basename(data.get('filename', 'upload.bin'))
     expected_size = int(data.get('size', 0))
 
     try:
+        if not client_dh_pub or not client_rsa_pub or not signature or not p or not g:
+            return jsonify({'error': 'Missing D-H parameters or authentication fields'}), 400
+
         client_hash = md5_hash(client_dh_pub)
         if not rsa_verify(client_hash, signature, client_rsa_pub):
             return jsonify({'error': 'Signature verification failed'}), 403
 
-        p, g = dh_generate_params()
         server_dh_pub, server_dh_priv = dh_generate_keypair(p, g)
 
         if not server_rsa_keys:
