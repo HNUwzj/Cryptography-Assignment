@@ -610,9 +610,9 @@
         <div id="rsa" class="tab-content">
             <div class="algorithm-card">
                 <div class="algorithm-title">RSA 非对称加密</div>
-                <div class="algorithm-desc">支持大于16bit的消息加密</div>
+                <div class="algorithm-desc">小模数 RSA 自构造实现，逐字节分组支持大于16bit的消息输入</div>
                 <div class="info-box">
-                    <strong>注意：</strong>RSA加密的消息长度受密钥大小限制。超过限制的消息请先使用对称加密，再用RSA加密对称密钥。
+                    <strong>说明：</strong>本实验按任务书要求使用小于16bit模数的自构造 RSA，并通过分组加密支持长消息。
                 </div>
                 <button onclick="rsaGenerateKeys()">生成密钥对</button>
             </div>
@@ -729,7 +729,7 @@
                 <div class="algorithm-title">增强 D-H 大文件安全传输</div>
                 <div class="algorithm-desc">服务端提供分块上传接口，客户端脚本按块加密传输，支持 1G 以上文件</div>
                 <div class="info-box">
-                    C/S 演示命令：先启动 Flask 服务，再运行 python secure_file_client.py path\to\large_file.bin
+                    C/S 演示命令：先启动 Flask 服务，再运行 python client.py --file path\to\large_file.bin
                 </div>
                 <div class="form-group">
                     <label>协议增强点</label>

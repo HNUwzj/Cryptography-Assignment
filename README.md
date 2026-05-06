@@ -28,7 +28,7 @@ $$
 
 ### 4. RSA 非对称加密
 - 支持大于 16bit 的消息加密
-- 模数规模可配置（默认 1024bit）
+- 自己构造小模数 RSA，模数规模小于 16bit；对长消息采用逐字节分组方式加密，因此支持大于 16bit 的消息输入
 
 ### 5. D-H 认证协议及增强 (Anti-MitM)
 - **双实体 C/S 网络通信模式**：项目包含严格的两个参与实体。`client.py` 作为客户端发起方，`app.py` 提供 REST API 作为服务端响应方，双方通过真实的 HTTP 网络请求进行通信。
@@ -134,6 +134,13 @@ python app.py
 
 ```bash
 python client.py --file D:\path\to\large_file.bin
+```
+
+如果需要现场准备 1G 以上测试文件，可先生成稀疏测试文件：
+
+```bash
+python client.py --make-test-file test_1g.bin --size-gb 1.1
+python client.py --file test_1g.bin
 ```
 
 协议流程包括：客户端 RSA 身份签名、客户端提交同一组 D-H 参数 `p,g`、D-H 会话密钥协商、服务端 RSA 签名返回、每个文件块 HMAC-SHA256 完整性验证、分块流式加密传输。客户端按块读取文件，适合 1G 以上容量文件，不会一次性加载整个文件。

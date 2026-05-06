@@ -39,12 +39,41 @@ def index():
     return render_template('index.html', crypto_available=crypto_available)
 
 # ==================== 仿射加密 ====================
+def load_config_params(config_type):
+    import xml.etree.ElementTree as ET
+
+    file_path = os.path.join(app.root_path, 'config', f'{config_type}_config.xml')
+    if not os.path.exists(file_path):
+        return {}
+
+    tree = ET.parse(file_path)
+    root = tree.getroot()
+    params = {}
+    param_node = root.find('parameters')
+    if param_node is not None:
+        for child in param_node:
+            params[child.tag] = child.text
+    elif config_type == 'stream':
+        example = root.find('example')
+        if example is not None:
+            seed = example.findtext('seed')
+            if seed:
+                params['seed'] = seed
+                params['key'] = seed
+    elif config_type == 'rsa':
+        kg = root.find('key_generation')
+        if kg is not None:
+            for child in kg:
+                params[child.tag] = child.text
+    return params
+
 @app.route('/api/affine/encrypt', methods=['POST'])
 def api_affine_encrypt():
     data = request.json
+    config = load_config_params('affine')
     plaintext = data.get('plaintext', '')
-    key_a = int(data.get('key_a', 5))
-    key_b = int(data.get('key_b', 8))
+    key_a = int(data.get('key_a') or config.get('key_a', 5))
+    key_b = int(data.get('key_b') or config.get('key_b', 8))
 
     if not crypto_available:
         return jsonify({'error': 'Crypto library not loaded'}), 500
@@ -58,9 +87,10 @@ def api_affine_encrypt():
 @app.route('/api/affine/decrypt', methods=['POST'])
 def api_affine_decrypt():
     data = request.json
+    config = load_config_params('affine')
     ciphertext = data.get('ciphertext', '')
-    key_a = int(data.get('key_a', 5))
-    key_b = int(data.get('key_b', 8))
+    key_a = int(data.get('key_a') or config.get('key_a', 5))
+    key_b = int(data.get('key_b') or config.get('key_b', 8))
 
     if not crypto_available:
         return jsonify({'error': 'Crypto library not loaded'}), 500
@@ -98,8 +128,9 @@ def api_bigint_calc():
 @app.route('/api/rc4/encrypt', methods=['POST'])
 def api_rc4_encrypt():
     data = request.json
+    config = load_config_params('stream')
     plaintext = data.get('plaintext', '')
-    key = data.get('key', '')
+    key = data.get('key') or config.get('key', 'mysecretseed12345')
 
     if not crypto_available:
         return jsonify({'error': 'Crypto library not loaded'}), 500
@@ -114,8 +145,9 @@ def api_rc4_encrypt():
 @app.route('/api/rc4/decrypt', methods=['POST'])
 def api_rc4_decrypt():
     data = request.json
+    config = load_config_params('stream')
     ciphertext_hex = data.get('ciphertext', '')
-    key = data.get('key', '')
+    key = data.get('key') or config.get('key', 'mysecretseed12345')
 
     if not crypto_available:
         return jsonify({'error': 'Crypto library not loaded'}), 500
@@ -132,8 +164,9 @@ def api_rc4_decrypt():
 @app.route('/api/lfsr_jk/encrypt', methods=['POST'])
 def api_lfsr_jk_encrypt():
     data = request.json
+    config = load_config_params('stream')
     plaintext = data.get('plaintext', '')
-    seed = data.get('seed', '')
+    seed = data.get('seed') or config.get('seed', 'mysecretseed12345')
 
     if not crypto_available:
         return jsonify({'error': 'Crypto library not loaded'}), 500
@@ -148,8 +181,9 @@ def api_lfsr_jk_encrypt():
 @app.route('/api/lfsr_jk/decrypt', methods=['POST'])
 def api_lfsr_jk_decrypt():
     data = request.json
+    config = load_config_params('stream')
     ciphertext_hex = data.get('ciphertext', '')
-    seed = data.get('seed', '')
+    seed = data.get('seed') or config.get('seed', 'mysecretseed12345')
 
     if not crypto_available:
         return jsonify({'error': 'Crypto library not loaded'}), 500
@@ -166,8 +200,9 @@ def api_lfsr_jk_decrypt():
 @app.route('/api/des/encrypt', methods=['POST'])
 def api_des_encrypt():
     data = request.json
+    config = load_config_params('des')
     plaintext = data.get('plaintext', '')
-    key = data.get('key', '')
+    key = data.get('key') or config.get('key', 'my8bytek')
 
     if not crypto_available:
         return jsonify({'error': 'Crypto library not loaded'}), 500
@@ -181,8 +216,9 @@ def api_des_encrypt():
 @app.route('/api/des/decrypt', methods=['POST'])
 def api_des_decrypt():
     data = request.json
+    config = load_config_params('des')
     ciphertext_hex = data.get('ciphertext', '')
-    key = data.get('key', '')
+    key = data.get('key') or config.get('key', 'my8bytek')
 
     if not crypto_available:
         return jsonify({'error': 'Crypto core not available'}), 500
@@ -200,7 +236,7 @@ def api_rsa_generate_keys():
         return jsonify({'error': 'Crypto library not loaded'}), 500
 
     try:
-        public_key, private_key = rsa_generate_keys(1024)
+        public_key, private_key = rsa_generate_keys(16)
         return jsonify({'public_key': public_key, 'private_key': private_key})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -350,7 +386,7 @@ def api_dh_auth_exchange():
         
         # 3. 服务端配置自己的 RSA 身份 (如果还没有)
         if not server_rsa_keys:
-            spub, spriv = rsa_generate_keys(1024)
+            spub, spriv = rsa_generate_keys(16)
             server_rsa_keys['pub'] = spub
             server_rsa_keys['priv'] = spriv
             
@@ -420,7 +456,7 @@ def api_secure_file_init():
         server_dh_pub, server_dh_priv = dh_generate_keypair(p, g)
 
         if not server_rsa_keys:
-            spub, spriv = rsa_generate_keys(1024)
+            spub, spriv = rsa_generate_keys(16)
             server_rsa_keys['pub'] = spub
             server_rsa_keys['priv'] = spriv
 

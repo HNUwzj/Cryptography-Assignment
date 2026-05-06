@@ -17,6 +17,12 @@ except ImportError as e:
 
 BASE_URL = "http://127.0.0.1:5000/api"
 
+def create_test_file(path, size_gb):
+    size = int(size_gb * 1024 * 1024 * 1024)
+    with open(path, "wb") as f:
+        f.truncate(size)
+    print(f"created sparse test file: {path} ({size} bytes)")
+
 def upload_large_file(path):
     from secure_file_client import upload_file
     result = upload_file(path, BASE_URL)
@@ -27,7 +33,12 @@ def upload_large_file(path):
 def main():
     parser = argparse.ArgumentParser(description="D-H authenticated communication client")
     parser.add_argument("--file", help="upload a large file with authenticated encrypted chunk transfer")
+    parser.add_argument("--make-test-file", help="create a sparse test file for 1G+ transfer demos")
+    parser.add_argument("--size-gb", type=float, default=1.1, help="test file size in GB, default: 1.1")
     args = parser.parse_args()
+    if args.make_test_file:
+        create_test_file(args.make_test_file, args.size_gb)
+        return
     if args.file:
         upload_large_file(args.file)
         return

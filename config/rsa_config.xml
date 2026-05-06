@@ -4,12 +4,12 @@
     <algorithm>RSA</algorithm>
 
     <key_generation>
-        <bits>1024</bits>
-        <public_exponent>65537</public_exponent>
+        <bits>16</bits>
+        <public_exponent>auto</public_exponent>
     </key_generation>
 
     <limits>
-        <max_message_length>117 bytes (for 1024-bit key)</max_message_length>
+        <max_message_length>unlimited demo input by byte-wise block encryption</max_message_length>
         <note>消息长度受密钥大小限制，超过限制请使用混合加密</note>
     </limits>
 
