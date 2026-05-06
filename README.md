@@ -1,154 +1,275 @@
-# 密码学综合服务系统
+# 密码学核心算法及协议综合服务系统
 
 ## 项目概述
 
-本项目实现了一个密码学核心算法及协议的综合服务系统，采用 **C++** 实现核心加密算法，**Python Flask** 提供 Web 前端服务。
+本项目是“密码学及应用”课程实验系统，实现了一个加解密综合服务平台。系统采用 B/S 架构：核心密码算法由 C++ 实现并编译为 `crypto_core.dll`，Python Flask 提供 Web 页面、REST API 和 C/S 通信服务。
 
-## 功能特性
+## 功能清单
 
-### 1. 仿射加密
-- 支持可配置的密钥参数 a 和 b
-- 支持 XML 配置文件输入
+### 1. 菜单式加解密服务界面
 
-仿射加密公式为：
+- Web 菜单式界面：`templates/index.html`
+- 后端服务：`app.py`
+- 浏览器访问：`http://localhost:5000`
 
-$$
-C \equiv a \cdot P + b \pmod{26}
-$$
+### 2. 仿射加密
 
-其中 $a$ 与模数 26 必须互素（即 $gcd(a, 26) = 1$），b 为平移量， P 为明文值（通常用 0-25 表示）。
+- 支持加密、解密
+- 密钥参数 `a`、`b` 可配置
+- 默认配置文件：`config/affine_config.xml`
+- 核心实现位于 DLL：`crypto_core/crypto_core.cpp`
 
-### 2. 流密码
-- **RC4**：基于密钥调度的流密码
-- **LFSR+J-K触发器**：线性反馈移位寄存器结合J-K触发器
+加密公式：
 
-### 3. DES 对称加密
-- 标准 DES 加密算法
-- 8字节密钥支持
-
-### 4. RSA 非对称加密
-- 支持大于 16bit 的消息加密
-- 自己构造小模数 RSA，模数规模小于 16bit；对长消息采用逐字节分组方式加密，因此支持大于 16bit 的消息输入
-
-### 5. D-H 认证协议及增强 (Anti-MitM)
-- **双实体 C/S 网络通信模式**：项目包含严格的两个参与实体。`client.py` 作为客户端发起方，`app.py` 提供 REST API 作为服务端响应方，双方通过真实的 HTTP 网络请求进行通信。
-- **消息完整性与来源验证（增强设计）**：基础的 D-H 协议容易受到中间人攻击 (MitM)。本项目采用以下结合设计进行增强：
-  - **散列函数 (MD5/SHA-1)**：在传输 D-H 公钥 (Y) 参数前，先对其提取摘要，保证参数如果在网络传输中被篡改能被立刻发现。
-  - **数字签名 (RSA)**：发送方使用自己的 RSA 私钥对散列摘要进行签名并随消息发送；接收方收到后，使用对应的 RSA 公钥解密签名进行比对。这不仅验证了消息的完整性，更实现了极强的**来源身份真实性验证**。
-- **使用说明**：保持 `app.py` 服务端运行的前提下，新开终端运行 `python client.py`。控制台会完整打印出“生成参数 -> MD5提取摘要 -> RSA签名 -> 网络传输 -> RSA验签 -> 协商出一致的共享密钥”的 7 步攻防交互全过程。
-
-### 6. 散列函数
-- SHA-1
-- MD5
-- **应用场景**：除了在 Web 端提供独立的文本散列计算演示外，在 C/S 架构中负责为 D-H 参数交换提取数字摘要，提供数据防篡改校验。
-
-### 7. 数字签名
-- RSA 签名与验证
-- **应用场景**：除了在 Web 端的独立演示，核心应用于 D-H 密钥交换过程中，通过“私钥加密摘要、公钥解密摘要”实现实体身份防伪装和来源验证。
-
-## 项目结构
-
-```
-test/
-├── crypto_core/          # C++ 核心算法
-│   ├── crypto_core.h     # 头文件
-│   └── crypto_core.cpp   # 实现文件
-├── config/               # 配置文件
-│   ├── affine_config.xml
-│   ├── stream_config.xml
-│   ├── des_config.xml
-│   └── rsa_config.xml
-├── templates/            # Web 模板
-│   └── index.html
-├── crypto_wrapper.py     # Python ctypes 包装器
-├── client.py             # D-H 认证协议独立客户端 (C/S模式)
-├── requirements.txt      # Python 依赖清单
-├── app.py                # Flask 主程序
-└── README.md
+```text
+C = (a * P + b) mod 26
 ```
 
-## 编译 C++ DLL (Windows)
+### 3. 128 位大整数运算
 
-我这里的方法是 g++ 编译成 dll，命令如下，请替换为自己的文件路径：
+- 自建 `UInt128` 类
+- 使用 `4 * 32bit` 分段存储 128 位整数
+- 支持两个 128 位整数的加法、减法、乘法
+- 支持十进制输入和 `0x` 开头的十六进制输入
+- DLL 导出函数：
+  - `bigint128_add`
+  - `bigint128_sub`
+  - `bigint128_mul`
 
-```bash
-cd "D:\密码学实验\Cryptography-Assignment\crypto_core"
-g++ -shared -O2 -std=c++11 -DCRYPTO_CORE_EXPORTS -o ..\crypto_core.dll crypto_core.cpp -I"C:\Program Files\OpenSSL-Win64\include" -L"C:\Program Files\OpenSSL-Win64\lib\VC\x64\MD" -lssl -lcrypto -lws2_32 -static-libgcc -static-libstdc++
+### 4. 流密码加密
+
+支持两种密钥流生成方式：
+
+- RC4
+- LFSR + J-K 触发器
+
+种子密钥配置文件：
+
+```text
+config/stream_config.xml
 ```
 
-## 运行服务
+注意：流密码密文是二进制数据，Web 页面以十六进制字符串显示。
 
-### 1. 确保已编译 crypto_core.dll 并放置在项目根目录
+### 5. DES 对称加密
 
-### 2. 安装 Python 依赖
+- 支持 DES 加密、解密
+- 使用 OpenSSL DES 接口
+- 默认密钥配置文件：`config/des_config.xml`
+- 密文以十六进制字符串显示
 
-```bash
-pip install -r requirements.txt
-```
+### 6. RSA 非对称加密
 
-### 3. 启动服务
+- 自己构造小模数 RSA
+- 模数规模小于 16bit
+- 使用逐字节分组加密方式支持大于 16bit 的消息输入
+- 密钥每次生成使用随机素数，不再固定
+- 配置文件：`config/rsa_config.xml`
 
-```bash
-python app.py
-```
+### 7. D-H 认证协议及增强通信
 
-打开浏览器访问: http://localhost:5000
+系统包含两个参与实体：
 
-若是作为服务器运行，则运行 .\start.bat，弹出的 Forwarding 后面跟着的就是公网链接。
-## 技术架构
+- 客户端：`client.py`
+- 服务端：`app.py`
 
-- **前端**: HTML5 + CSS3 + JavaScript (无框架)
-- **后端**: Python Flask
-- **核心算法**: C++ + OpenSSL
-- **通信**: RESTful API (JSON)
+通信方式：
 
-## 验收要求
+- 客户端通过 HTTP 请求访问 Flask 服务端
+- 双方使用同一组 D-H 参数 `p, g`
+- 客户端发送 `p, g, Ya, Client_RSA_PublicKey, Signature`
+- 服务端返回 `Yb, Server_RSA_PublicKey, Signature`
 
-- [x] 加解密综合服务菜单式展示界面 (B/S)
-- [x] 仿射加密（密钥可配置）
-- [x] 大整数运算（自建 128 位整数类，加、减、乘）
-- [x] 流密码（RC4、LFSR+J-K触发器）
-- [x] 对称加密（DES）
-- [x] 非对称加密（RSA，支持大于16bit消息）
-- [x] D-H认证协议（C/S模式）
-- [x] 基于 D-H 认证协议的大文件分块加密传输（支持 1G 以上文件）
-- [x] 散列函数（SHA-1、MD5）
-- [x] 数字签名（RSA）
-- [x] 所有基础算法构建在 DLL 中
+增强设计：
 
-## 新增功能使用
+- 使用 MD5 对 D-H 公钥做摘要
+- 使用 RSA 对摘要做数字签名
+- 接收方使用对方 RSA 公钥验签
+- 同时实现消息完整性验证和来源验证
 
-### 128 位大整数运算
-
-Web 页面左侧菜单选择“128位大整数”，输入两个十进制整数或 `0x` 开头的十六进制整数，点击加法、减法、乘法即可。底层实现位于 `crypto_core/crypto_core.cpp` 的 `UInt128` 自建类，并通过 DLL 导出。
-
-### 1G+ 大文件安全传输
-
-先启动服务端：
+运行演示：
 
 ```bash
 python app.py
+python client.py
 ```
 
-再运行客户端脚本上传文件：
+示例输出格式：
+
+```text
+================ D-H 增强认证通信演示 ================
+
+[Client] 生成 RSA 身份密钥
+         Client PublicKey = 20567,7
+
+[Client] 生成 D-H 公钥 Ya
+         Ya = B6438E7F06DA54B5D45A7334...
+
+[Client] 对 Ya 做 MD5 摘要
+         MD5(Ya) = 1b57ad495d75ecbd047bc2556e2cd1dc
+
+[Client] 用 RSA 私钥签名摘要
+         Sign(MD5(Ya)) = 4d3e3a994d4d2a101e0c3e30...
+
+[Client -> Server] 发送：
+         p, g, Ya, Client_RSA_PublicKey, Signature
+
+[Server] 验证客户端签名
+         RSA_Verify(Client_PublicKey, Signature, MD5(Ya)) = 通过
+
+[Server] 生成 D-H 公钥 Yb
+         Yb = 1D36B80558894BCE492C47BF...
+
+[Server] 对 Yb 做 MD5 摘要并签名
+         MD5(Yb) = 769252fbca4e8b950747c4dc6dcbeb43
+         Sign(MD5(Yb)) = 785688f45bf832c60ba495e2...
+
+[Server -> Client] 返回：
+         Yb, Server_RSA_PublicKey, Signature
+
+[Client] 验证服务端签名
+         RSA_Verify(Server_PublicKey, Signature, MD5(Yb)) = 通过
+
+[Client] 计算共享密钥
+         SharedSecret_Client = 6BD6386D3A5D6B4A305036CF47B083A98096FC89BF93112E...
+
+[Server] 计算共享密钥
+         SharedSecret_Server = 6BD6386D3A5D6B4A305036CF47B083A98096FC89BF93112E...
+
+[结果] 双方共享密钥一致，D-H 增强认证通信成功！
+=====================================================
+```
+
+### 8. 1G 以上文件加密传输
+
+服务端接口：
+
+- `/api/secure_file/init`
+- `/api/secure_file/chunk`
+- `/api/secure_file/finish`
+
+传输设计：
+
+- D-H 协商共享密钥
+- RSA 签名验证 D-H 公钥来源
+- 每个文件块使用 HMAC-SHA256 做完整性校验
+- 文件按 1MB 分块读取、加密、发送
+- 不会一次性把整个文件加载到内存，支持 1G 以上文件
+
+上传文件：
 
 ```bash
+python app.py
 python client.py --file D:\path\to\large_file.bin
 ```
 
-如果需要现场准备 1G 以上测试文件，可先生成稀疏测试文件：
+生成 1G 以上测试文件并上传：
 
 ```bash
 python client.py --make-test-file test_1g.bin --size-gb 1.1
 python client.py --file test_1g.bin
 ```
 
-协议流程包括：客户端 RSA 身份签名、客户端提交同一组 D-H 参数 `p,g`、D-H 会话密钥协商、服务端 RSA 签名返回、每个文件块 HMAC-SHA256 完整性验证、分块流式加密传输。客户端按块读取文件，适合 1G 以上容量文件，不会一次性加载整个文件。
+### 9. 散列函数与数字签名
+
+支持：
+
+- MD5
+- SHA-1
+- RSA 签名
+- RSA 验签
+
+这些功能既可以在 Web 页面单独演示，也用于 D-H 增强认证协议。
+
+## 项目结构
+
+```text
+Cryptography-Assignment/
+├── app.py                    # Flask Web 服务端
+├── client.py                 # D-H 认证通信与大文件传输客户端
+├── secure_file_client.py     # 大文件安全传输实现
+├── crypto_wrapper.py         # Python ctypes DLL 包装层
+├── crypto_core.dll           # C++ 核心算法 DLL
+├── crypto_core/
+│   ├── crypto_core.h         # DLL 导出接口
+│   └── crypto_core.cpp       # 核心算法实现
+├── config/
+│   ├── affine_config.xml     # 仿射加密配置
+│   ├── stream_config.xml     # 流密码配置
+│   ├── des_config.xml        # DES 配置
+│   └── rsa_config.xml        # RSA 配置
+├── templates/
+│   └── index.html            # Web 页面
+├── requirements.txt
+├── start.bat
+└── README.md
+```
+
+## 编译 C++ DLL
+
+Windows + MinGW 示例：
+
+```bash
+cd "D:\密码学实验\Cryptography-Assignment\crypto_core"
+g++ -shared -O2 -std=c++11 -DCRYPTO_CORE_EXPORTS -o ..\crypto_core.dll crypto_core.cpp -I"C:\Program Files\OpenSSL-Win64\include" -L"C:\Program Files\OpenSSL-Win64\lib\VC\x64\MD" -lssl -lcrypto -lws2_32 -static-libgcc -static-libstdc++
+```
+
+如果 `crypto_core.dll` 正在被 Flask/Python 占用，请先停止服务后再重新编译。
+
+## 运行方式
+
+安装依赖：
+
+```bash
+pip install -r requirements.txt
+```
+
+启动 Web 服务：
+
+```bash
+python app.py
+```
+
+访问：
+
+```text
+http://localhost:5000
+```
+
+运行 D-H 增强认证通信演示：
+
+```bash
+python client.py
+```
+
+运行大文件安全传输：
+
+```bash
+python client.py --file D:\path\to\large_file.bin
+```
+
+## 验收对照
+
+- [x] 加解密综合服务菜单式展示界面
+- [x] 仿射加密，密钥支持 XML 配置
+- [x] 128 位大整数加、减、乘运算，自建类实现
+- [x] 流密码 RC4
+- [x] 流密码 LFSR + J-K 触发器
+- [x] 流密码种子密钥支持 XML 配置
+- [x] DES 对称加密，密钥支持 XML 配置
+- [x] RSA 非对称加密，自构造小模数，支持长消息输入
+- [x] D-H 认证协议，两个参与实体，真实网络通信
+- [x] MD5/SHA-1 摘要
+- [x] RSA 数字签名和验签
+- [x] 消息完整性验证和来源验证
+- [x] 1G 以上文件分块加密传输
+- [x] 基础算法构建在 DLL 中
 
 ## 依赖
 
-- OpenSSL (用于 RSA、D-H、SHA、MD5、DES)
 - Python 3.7+
 - Flask
-- MinGW 或 Visual Studio (用于编译 C++ DLL)
+- requests
+- OpenSSL
+- MinGW 或 Visual Studio C++ 编译工具
 
