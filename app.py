@@ -403,6 +403,7 @@ def api_dh_auth_exchange():
             'server_dh_pub': server_dh_pub,
             'server_rsa_pub': server_rsa_keys['pub'],
             'signature': server_sig,
+            'server_shared_secret_preview': shared_secret[:48],
             'p': p,
             'g': g
         })

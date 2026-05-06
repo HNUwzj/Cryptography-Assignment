@@ -1,21 +1,31 @@
-import requests
-import json
-import os
-import sys
 import argparse
+import sys
 
-# 尝试导入我们自己本地打包的加密库，因为客户端也要做本地的密码学计算
+import requests
+
 try:
     from crypto_wrapper import (
-        rsa_generate_keys, rsa_sign, rsa_verify,
-        dh_generate_params, dh_generate_keypair, dh_compute_shared_secret,
-        md5_hash, sha1_hash
+        dh_compute_shared_secret,
+        dh_generate_keypair,
+        dh_generate_params,
+        md5_hash,
+        rsa_generate_keys,
+        rsa_sign,
+        rsa_verify,
     )
-except ImportError as e:
+except ImportError:
     print("Error: Could not import crypto_wrapper. Make sure crypto_core.dll exists.")
     sys.exit(1)
 
+
 BASE_URL = "http://127.0.0.1:5000/api"
+
+
+def short(value, length=24):
+    if not value:
+        return ""
+    return value if len(value) <= length else value[:length] + "..."
+
 
 def create_test_file(path, size_gb):
     size = int(size_gb * 1024 * 1024 * 1024)
@@ -23,12 +33,95 @@ def create_test_file(path, size_gb):
         f.truncate(size)
     print(f"created sparse test file: {path} ({size} bytes)")
 
+
 def upload_large_file(path):
     from secure_file_client import upload_file
+
     result = upload_file(path, BASE_URL)
-    print("=== Large file secure transfer completed ===")
-    print(f"saved_path: {result['saved_path']}")
-    print(f"sha1: {result['sha1']}")
+    print("=== 大文件安全传输完成 ===")
+    print(f"保存路径: {result['saved_path']}")
+    print(f"SHA-1: {result['sha1']}")
+
+
+def demo_dh_auth_exchange():
+    print("================ D-H 增强认证通信演示 ================")
+
+    print("\n[Client] 生成 RSA 身份密钥")
+    client_rsa_pub, client_rsa_priv = rsa_generate_keys(16)
+    print(f"         Client PublicKey = {client_rsa_pub}")
+
+    p, g = dh_generate_params()
+    client_dh_pub, client_dh_priv = dh_generate_keypair(p, g)
+    print("\n[Client] 生成 D-H 公钥 Ya")
+    print(f"         Ya = {short(client_dh_pub)}")
+
+    client_hash = md5_hash(client_dh_pub)
+    print("\n[Client] 对 Ya 做 MD5 摘要")
+    print(f"         MD5(Ya) = {client_hash}")
+
+    client_sig = rsa_sign(client_hash, client_rsa_priv)
+    print("\n[Client] 用 RSA 私钥签名摘要")
+    print(f"         Sign(MD5(Ya)) = {short(client_sig)}")
+
+    payload = {
+        "p": p,
+        "g": g,
+        "client_dh_pub": client_dh_pub,
+        "client_rsa_pub": client_rsa_pub,
+        "signature": client_sig,
+    }
+    print("\n[Client -> Server] 发送：")
+    print("         p, g, Ya, Client_RSA_PublicKey, Signature")
+
+    response = requests.post(f"{BASE_URL}/dh/auth_exchange", json=payload, timeout=30)
+    if response.status_code != 200:
+        print("\n[结果] D-H 增强认证通信失败")
+        print(f"       Server response: {response.text}")
+        return
+
+    data = response.json()
+    print("\n[Server] 验证客户端签名")
+    print("         RSA_Verify(Client_PublicKey, Signature, MD5(Ya)) = 通过")
+
+    server_dh_pub = data["server_dh_pub"]
+    server_rsa_pub = data["server_rsa_pub"]
+    server_sig = data["signature"]
+
+    print("\n[Server] 生成 D-H 公钥 Yb")
+    print(f"         Yb = {short(server_dh_pub)}")
+
+    server_hash = md5_hash(server_dh_pub)
+    print("\n[Server] 对 Yb 做 MD5 摘要并签名")
+    print(f"         MD5(Yb) = {server_hash}")
+    print(f"         Sign(MD5(Yb)) = {short(server_sig)}")
+
+    print("\n[Server -> Client] 返回：")
+    print("         Yb, Server_RSA_PublicKey, Signature")
+
+    server_valid = rsa_verify(server_hash, server_sig, server_rsa_pub)
+    print("\n[Client] 验证服务端签名")
+    print(f"         RSA_Verify(Server_PublicKey, Signature, MD5(Yb)) = {'通过' if server_valid else '失败'}")
+    if not server_valid:
+        print("\n[结果] 服务端签名验证失败，通信终止")
+        print("=====================================================")
+        return
+
+    shared_secret = dh_compute_shared_secret(server_dh_pub, client_dh_priv, p)
+    client_preview = shared_secret[:48]
+    server_preview = data.get("server_shared_secret_preview", "")
+
+    print("\n[Client] 计算共享密钥")
+    print(f"         SharedSecret_Client = {client_preview}...")
+
+    print("\n[Server] 计算共享密钥")
+    print(f"         SharedSecret_Server = {server_preview}...")
+
+    if client_preview == server_preview:
+        print("\n[结果] 双方共享密钥一致，D-H 增强认证通信成功！")
+    else:
+        print("\n[结果] 双方共享密钥不一致，D-H 增强认证通信失败！")
+    print("=====================================================")
+
 
 def main():
     parser = argparse.ArgumentParser(description="D-H authenticated communication client")
@@ -36,6 +129,7 @@ def main():
     parser.add_argument("--make-test-file", help="create a sparse test file for 1G+ transfer demos")
     parser.add_argument("--size-gb", type=float, default=1.1, help="test file size in GB, default: 1.1")
     args = parser.parse_args()
+
     if args.make_test_file:
         create_test_file(args.make_test_file, args.size_gb)
         return
@@ -43,74 +137,8 @@ def main():
         upload_large_file(args.file)
         return
 
-    print("=" * 60)
-    print(" 增强型 D-H 认证协议客户端 (Anti-MitM) 测试与通信演示 ")
-    print("=" * 60)
+    demo_dh_auth_exchange()
 
-    # 1. 客户端本地生成 RSA 身份密钥
-    print("[1] 客户端正在生成自己的 RSA 身份公私钥对...")
-    c_rsa_pub, c_rsa_priv = rsa_generate_keys(1024)
-    print(f"    - 公钥: {c_rsa_pub}")
-    
-    # 2. 客户端获取系统 D-H 全局参数 (也可以通过向服务端请求)
-    print("\n[2] 获取全局防篡改 D-H 参数...")
-    # 为了演示，客户端可以请求系统全局参数
-    resp = requests.post(f"{BASE_URL}/dh/generate_params")
-    if resp.status_code != 200:
-        print("    ! 无法连接服务端，是否启动了 Flask APP?")
-        return
-        
-    p = resp.json()['p']
-    g = resp.json()['g']
-    
-    # 3. 客户端生成本次会话的 D-H 密钥对的 Y_A 
-    print("\n[3] 客户端生成本次会话的 D-H 公私钥对 (Y_a, X_a)...")
-    c_dh_pub, c_dh_priv = dh_generate_keypair(p, g)
-    
-    # 4. 增强安全：为了防篡改（中间人攻击），使用散列算法对消息摘要并签名
-    print("\n[4] 客户端使用 MD5 对 D-H 公钥 Y_a 进行散列，并用 RSA 私钥进行签名：完整性验证与身份证明")
-    c_hash = md5_hash(c_dh_pub)
-    c_sig = rsa_sign(c_hash, c_rsa_priv)
-    
-    payload = {
-        'client_dh_pub': c_dh_pub,
-        'client_rsa_pub': c_rsa_pub,
-        'signature': c_sig,
-        'p': p,
-        'g': g
-    }
-
-    # 5. 发送至服务端
-    print("\n[5] 正向服务端发送带有签名的 D-H 密钥交换请求...")
-    auth_resp = requests.post(f"{BASE_URL}/dh/auth_exchange", json=payload)
-    
-    if auth_resp.status_code != 200:
-        print(f"    ! 认证失败或发生内部错误: {auth_resp.text}")
-        return
-        
-    s_data = auth_resp.json()
-    print("    => 交换成功！服务端已成功验证我的身份，并返回了服务端的 Y_b 和签名。")
-    
-    s_dh_pub = s_data['server_dh_pub']
-    s_rsa_pub = s_data['server_rsa_pub']
-    s_sig = s_data['signature']
-    
-    # 6. 验证服务端的签名
-    print("\n[6] 客户端验证服务端返回的数据签名，确保来源是真实的 Server 且数据未被篡改...")
-    s_hash = md5_hash(s_dh_pub)
-    is_valid = rsa_verify(s_hash, s_sig, s_rsa_pub)
-    
-    if is_valid:
-        print("    => 验证通过！服务端的源是可信的, 消息完整！")
-    else:
-        print("    !! 严重安全警告：验证失败！检测到中间人攻击或数据损坏！")
-        return
-        
-    # 7. 生成最终的会话密钥
-    print("\n[7] 双方验证通过！客户端开始计算最终的协商共享密钥 (Shared Secret)...")
-    shared_secret = dh_compute_shared_secret(s_dh_pub, c_dh_priv, p)
-    print(f"\n[最终协商密钥] (截断展示):\n    {shared_secret[:48]}......\n")
-    print("=== D-H 通信协议演示完成！ ===")
 
 if __name__ == "__main__":
     main()

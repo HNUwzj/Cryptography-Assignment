@@ -5,6 +5,8 @@
 #include <string>
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
+#include <ctime>
 #include <openssl/bn.h>
 #include <openssl/sha.h>
 #include <openssl/md5.h>
@@ -400,12 +402,22 @@ static bool is_prime(long long n) {
 static long long get_rand_prime() {
     while(true) {
         // 修改随机区间：生成 100 到 249 的素数，确保 n = p*q 大于 255 避免丢失单字节，同时小于 65535 不超 `%04llx` 格式的限制
-        long long p = rand() % 150 + 100;
+        unsigned int r = 0;
+        if (RAND_bytes((unsigned char*)&r, sizeof(r)) != 1) {
+            r = (unsigned int)rand();
+        }
+        long long p = r % 150 + 100;
         if (is_prime(p)) return p;
     }
 }
 
 CRYPTO_API void rsa_generate_keys(int bits, char* public_key, char* private_key) {
+    static bool seeded = false;
+    if (!seeded) {
+        srand((unsigned int)time(NULL));
+        seeded = true;
+    }
+
     long long p, q;
     do { p = get_rand_prime(); q = get_rand_prime(); } while(p == q);
     long long n = p * q;
