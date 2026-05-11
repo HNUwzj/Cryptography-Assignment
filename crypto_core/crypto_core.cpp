@@ -256,7 +256,7 @@ CRYPTO_API void affine_decrypt(const char* ciphertext, const char* key_a, const 
     output[len] = '\0';
 }
 
-// ==================== RC4 娴佸瘑鐮?====================
+// ==================== RC4 流密码 ====================
 static unsigned char S[256];
 static int rc4_initialized = 0;
 
@@ -296,7 +296,7 @@ CRYPTO_API void rc4_decrypt(const char* input, int len, char* output) {
     rc4_encrypt(input, len, output);
 }
 
-// ==================== LFSR + J-K瑙﹀彂鍣?====================
+// ==================== LFSR + J-K 触发器 ====================
 static unsigned char lfsr_register[16];
 static unsigned char jk_q = 0;
 static int lfsr_initialized = 0;
@@ -318,7 +318,7 @@ CRYPTO_API void lfsr_jk_init(const char* seed, int seed_len) {
         }
     }
 
-    // 鍒濆鍖朖-K瑙﹀彂鍣ㄧ姸鎬?
+    // 初始化 LFSR 状态，避免全 0 状态锁死
     bool all_zero = true;
     for (int i = 0; i < 16; i++) {
         if (lfsr_register[i]) {
@@ -351,7 +351,7 @@ static unsigned char lfsr_generate_bit() {
     }
     lfsr_register[0] = feedback;
 
-    // J-K瑙﹀彂鍣?
+    // J-K 触发器
     unsigned char j = lfsr_register[1];
     unsigned char k = lfsr_register[3];
     jk_q = jk_next(j, k, jk_q);
@@ -387,7 +387,7 @@ CRYPTO_API void des_encrypt(const char* plaintext, const char* key, char* output
     DES_key_schedule schedule;
     DES_cblock key_block;
 
-    // 澶勭悊瀵嗛挜锛堝彇鍓?瀛楄妭鎴栧～鍏咃級
+    // 处理密钥，短密钥循环填充到 8 字节
     if (!key || key[0] == '\0') {
         output[0] = '\0';
         return;
@@ -412,7 +412,7 @@ CRYPTO_API void des_encrypt(const char* plaintext, const char* key, char* output
         DES_ecb_encrypt((DES_cblock*)(buffer + i), (DES_cblock*)(output + i), &schedule, DES_ENCRYPT);
     }
     
-    // 杞负鍗佸叚杩涘埗杈撳嚭锛岄槻姝㈢敱浜庡瘑鏂囦腑瀛樺湪 \x00 瀵艰嚧鍚庨潰褰撳瓧绗︿覆澶勭悊鏃惰鎴柇鎶ラ敊
+    // 转为十六进制输出，避免密文中的 \x00 截断 C 字符串
     int hex_offset = 0;
     char* temp_hex = new char[padded_len * 2 + 1];
     for (int i = 0; i < padded_len; i++) {
@@ -452,14 +452,14 @@ CRYPTO_API void des_decrypt(const char* ciphertext_hex, const char* key, char* o
         DES_ecb_encrypt((DES_cblock*)(buffer + i), (DES_cblock*)(output + i), &schedule, DES_DECRYPT);
     }
 
-    // 鍘婚櫎濉厖
+    // 去除 PKCS#7 风格填充
     int padding = output[len - 1];
     output[len - padding] = '\0';
 
     delete[] buffer;
 }
 
-// ==================== RSA 闈炲绉板姞瀵?====================
+// ==================== RSA 非对称加密 ====================
 static long long extgcd(long long a, long long b, long long &x, long long &y) {
     if (b == 0) { x = 1; y = 0; return a; }
     long long x1, y1;
@@ -722,8 +722,7 @@ CRYPTO_API int rsa_verify(const char* message, const char* signature_hex, const 
 }
 
 CRYPTO_API void dh_generate_params(char* p, char* g) {
-    // 浣跨敤棰勫畾涔夌殑绱犳暟鍜屽師鏍癸紙娉ㄦ剰锛欱N_hex2bn涓嶈兘甯︽湁 0x 鍓嶇紑锛?
-    strcpy(p, "D5F6C9C2A7B9E8F1D3A4B6C8E9F2A1B4C6D8E0F3A5B7C9D1E4F6A8B0C2D5E7F9A1B3C5D7E9F0A2B4C6D8E1F3A5B7C0D2E4F6A8B1C3D5E7F9A2B4C6D9E0F2A4B6C8D0E3A5B7C1D3E5F7A9B2C4D6E8F1A3B5C7D0E2A4B6C8D1E3A5B7C9D2E4F6A8B0C2D4E6F8A1B3C5D7E9F1A3B5C7D0E2A4B6C8D1E3A5B7C0D2E4F6A8B1C3D5E7F9A2B4C6D8E0F3A5B7C1D3E5F7A9B2C4D6E8F0A2B4C6D9E1F3A5B7C0D2E4F6A8B1C3D5E7F9A2B4C6D8E0F2A4B6C8D1E3A5B7C9D2E4F6A8B0C2D4E6F8A1B3C5D7E9F1");
+    // 使用 RFC 3526 2048-bit MODP 组参数，生成元为 2
     BIGNUM* p_bn = BN_get_rfc3526_prime_2048(nullptr);
     char* p_hex = BN_bn2hex(p_bn);
     strcpy(p, p_hex);
