@@ -4,7 +4,7 @@
     <algorithm>RSA</algorithm>
 
     <key_generation>
-        <bits>16</bits>
+        <bits>1024</bits>
         <public_exponent>auto</public_exponent>
     </key_generation>
 

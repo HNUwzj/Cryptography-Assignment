@@ -236,7 +236,9 @@ def api_rsa_generate_keys():
         return jsonify({'error': 'Crypto library not loaded'}), 500
 
     try:
-        public_key, private_key = rsa_generate_keys(16)
+        config = load_config_params('rsa')
+        bits = int(config.get('bits', 1024))
+        public_key, private_key = rsa_generate_keys(bits)
         return jsonify({'public_key': public_key, 'private_key': private_key})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -386,7 +388,7 @@ def api_dh_auth_exchange():
         
         # 3. 服务端配置自己的 RSA 身份 (如果还没有)
         if not server_rsa_keys:
-            spub, spriv = rsa_generate_keys(16)
+            spub, spriv = rsa_generate_keys(1024)
             server_rsa_keys['pub'] = spub
             server_rsa_keys['priv'] = spriv
             
@@ -457,7 +459,7 @@ def api_secure_file_init():
         server_dh_pub, server_dh_priv = dh_generate_keypair(p, g)
 
         if not server_rsa_keys:
-            spub, spriv = rsa_generate_keys(16)
+            spub, spriv = rsa_generate_keys(1024)
             server_rsa_keys['pub'] = spub
             server_rsa_keys['priv'] = spriv
 
@@ -598,7 +600,7 @@ def api_config_load():
 server_rsa_pub = ""
 server_rsa_priv = ""
 if crypto_available:
-    server_rsa_pub, server_rsa_priv = rsa_generate_keys(16)
+    server_rsa_pub, server_rsa_priv = rsa_generate_keys(1024)
 
 @app.route('/api/dh/exchange', methods=['POST'])
 def api_dh_exchange():
@@ -640,11 +642,11 @@ import requests
 def api_assistant():
     data = request.json
     # 从本地获取配置的 API Key
-    api_key = "sk-cp-6HxG_aJO6AUJy_LRSSgwIK_ms52VP8GNLpYUQAcE-mv55a8DrCXgeJ080cdir-Vx5XnpoNQQ9yQS7ib6w7FwNMC8CT3kfg-_AfSFNlz0RsmBR6TUbQ3DJ0Q"
+    api_key = os.environ.get("MINIMAX_API_KEY", "")
     messages = data.get('messages', [])
     
-    if not api_key or api_key == "改为你的MiniMaxAPI_KEY":
-        return jsonify({'error': '请在 app.py 中本地配置好你的 API key。'}), 400
+    if not api_key:
+        return jsonify({'error': '请先设置 MINIMAX_API_KEY 环境变量。'}), 400
         
     url = "https://api.minimaxi.com/anthropic/v1/messages"
 

@@ -20,12 +20,43 @@ static std::string intToString(int val) {
     return buf;
 }
 
-static int modInverse(int a, int m) {
-    a = a % m;
-    for (int x = 1; x < m; x++) {
-        if ((a * x) % m == 1) return x;
+static int gcd_int(int a, int b) {
+    a = abs(a);
+    b = abs(b);
+    while (b != 0) {
+        int t = a % b;
+        a = b;
+        b = t;
     }
-    return 1;
+    return a;
+}
+
+static int positive_mod(int a, int m) {
+    int r = a % m;
+    return r < 0 ? r + m : r;
+}
+
+static int modInverse(int a, int m) {
+    if (m <= 1) return 0;
+
+    int original_m = m;
+    a = positive_mod(a, m);
+
+    int old_r = a, r = m;
+    int old_s = 1, s = 0;
+    while (r != 0) {
+        int q = old_r / r;
+        int next_r = old_r - q * r;
+        old_r = r;
+        r = next_r;
+
+        int next_s = old_s - q * s;
+        old_s = s;
+        s = next_s;
+    }
+
+    if (old_r != 1) return 0;
+    return positive_mod(old_s, original_m);
 }
 
 // ==================== 仿射加密 ====================
@@ -186,12 +217,16 @@ CRYPTO_API void affine_encrypt(const char* plaintext, const char* key_a, const c
     int a = atoi(key_a);
     int b = atoi(key_b);
     int len = strlen(plaintext);
+    if (gcd_int(a, 26) != 1) {
+        output[0] = '\0';
+        return;
+    }
 
     for (int i = 0; i < len; i++) {
         if (plaintext[i] >= 'a' && plaintext[i] <= 'z') {
-            output[i] = ((a * (plaintext[i] - 'a') + b) % 26) + 'a';
+            output[i] = positive_mod(a * (plaintext[i] - 'a') + b, 26) + 'a';
         } else if (plaintext[i] >= 'A' && plaintext[i] <= 'Z') {
-            output[i] = ((a * (plaintext[i] - 'A') + b) % 26) + 'A';
+            output[i] = positive_mod(a * (plaintext[i] - 'A') + b, 26) + 'A';
         } else {
             output[i] = plaintext[i];
         }
@@ -204,12 +239,16 @@ CRYPTO_API void affine_decrypt(const char* ciphertext, const char* key_a, const 
     int b = atoi(key_b);
     int a_inv = modInverse(a, 26);
     int len = strlen(ciphertext);
+    if (a_inv == 0) {
+        output[0] = '\0';
+        return;
+    }
 
     for (int i = 0; i < len; i++) {
         if (ciphertext[i] >= 'a' && ciphertext[i] <= 'z') {
-            output[i] = ((a_inv * ((ciphertext[i] - 'a' - b + 26) % 26)) % 26) + 'a';
+            output[i] = positive_mod(a_inv * positive_mod(ciphertext[i] - 'a' - b, 26), 26) + 'a';
         } else if (ciphertext[i] >= 'A' && ciphertext[i] <= 'Z') {
-            output[i] = ((a_inv * ((ciphertext[i] - 'A' - b + 26) % 26)) % 26) + 'A';
+            output[i] = positive_mod(a_inv * positive_mod(ciphertext[i] - 'A' - b, 26), 26) + 'A';
         } else {
             output[i] = ciphertext[i];
         }
@@ -217,11 +256,16 @@ CRYPTO_API void affine_decrypt(const char* ciphertext, const char* key_a, const 
     output[len] = '\0';
 }
 
-// ==================== RC4 流密码 ====================
+// ==================== RC4 娴佸瘑鐮?====================
 static unsigned char S[256];
 static int rc4_initialized = 0;
 
 CRYPTO_API void rc4_init(const char* key, int key_len) {
+    if (!key || key_len <= 0) {
+        rc4_initialized = 0;
+        return;
+    }
+
     rc4_initialized = 1;
     for (int i = 0; i < 256; i++) S[i] = i;
 
@@ -233,7 +277,10 @@ CRYPTO_API void rc4_init(const char* key, int key_len) {
 }
 
 CRYPTO_API void rc4_encrypt(const char* input, int len, char* output) {
-    if (!rc4_initialized) return;
+    if (!rc4_initialized) {
+        output[0] = '\0';
+        return;
+    }
     int i = 0, j = 0;
     for (int k = 0; k < len; k++) {
         i = (i + 1) % 256;
@@ -249,50 +296,84 @@ CRYPTO_API void rc4_decrypt(const char* input, int len, char* output) {
     rc4_encrypt(input, len, output);
 }
 
-// ==================== LFSR + J-K触发器 ====================
+// ==================== LFSR + J-K瑙﹀彂鍣?====================
 static unsigned char lfsr_register[16];
-static unsigned char jk_state[2];
+static unsigned char jk_q = 0;
 static int lfsr_initialized = 0;
 
 CRYPTO_API void lfsr_jk_init(const char* seed, int seed_len) {
-    lfsr_initialized = 1;
-    memset(lfsr_register, 0, sizeof(lfsr_register));
-    memset(jk_state, 0, sizeof(jk_state));
-
-    for (int i = 0; i < seed_len && i < 16; i++) {
-        lfsr_register[i] = seed[i];
+    if (!seed || seed_len <= 0) {
+        lfsr_initialized = 0;
+        return;
     }
 
-    // 初始化J-K触发器状态
-    jk_state[0] = seed[seed_len % seed_len];
-    jk_state[1] = seed[(seed_len + 1) % seed_len];
+    lfsr_initialized = 1;
+    memset(lfsr_register, 0, sizeof(lfsr_register));
+
+    for (int i = 0; i < 16; i++) {
+        int byte_index = i / 8;
+        int bit_index = 7 - (i % 8);
+        if (byte_index < seed_len) {
+            lfsr_register[i] = ((unsigned char)seed[byte_index] >> bit_index) & 1;
+        }
+    }
+
+    // 鍒濆鍖朖-K瑙﹀彂鍣ㄧ姸鎬?
+    bool all_zero = true;
+    for (int i = 0; i < 16; i++) {
+        if (lfsr_register[i]) {
+            all_zero = false;
+            break;
+        }
+    }
+    if (all_zero) lfsr_register[15] = 1;
+
+    jk_q = ((unsigned char)seed[0]) & 1;
 }
 
-static unsigned char lfsr_generate() {
-    unsigned char feedback = lfsr_register[15] ^ lfsr_register[14] ^ lfsr_register[13] ^ lfsr_register[11];
+static unsigned char jk_next(unsigned char j, unsigned char k, unsigned char q) {
+    j &= 1;
+    k &= 1;
+    q &= 1;
+
+    if (j == 0 && k == 0) return q;       // hold
+    if (j == 0 && k == 1) return 0;       // reset
+    if (j == 1 && k == 0) return 1;       // set
+    return q ^ 1;                         // toggle
+}
+
+static unsigned char lfsr_generate_bit() {
+    unsigned char output_bit = lfsr_register[15] & 1;
+    unsigned char feedback = (lfsr_register[15] ^ lfsr_register[14] ^ lfsr_register[13] ^ lfsr_register[11]) & 1;
 
     for (int i = 15; i > 0; i--) {
         lfsr_register[i] = lfsr_register[i - 1];
     }
     lfsr_register[0] = feedback;
 
-    // J-K触发器
-    unsigned char j = jk_state[0];
-    unsigned char k = jk_state[1];
-    unsigned char clk = lfsr_register[0];
+    // J-K瑙﹀彂鍣?
+    unsigned char j = lfsr_register[1];
+    unsigned char k = lfsr_register[3];
+    jk_q = jk_next(j, k, jk_q);
 
-    if (clk) {
-        jk_state[1] = j & jk_state[0];
-        jk_state[0] = k ^ jk_state[0];
+    return output_bit ^ jk_q;
+}
+
+static unsigned char lfsr_generate_byte() {
+    unsigned char byte = 0;
+    for (int i = 0; i < 8; i++) {
+        byte = (unsigned char)((byte << 1) | lfsr_generate_bit());
     }
-
-    return lfsr_register[15] ^ jk_state[0];
+    return byte;
 }
 
 CRYPTO_API void lfsr_jk_encrypt(const char* input, int len, char* output) {
-    if (!lfsr_initialized) return;
+    if (!lfsr_initialized) {
+        output[0] = '\0';
+        return;
+    }
     for (int i = 0; i < len; i++) {
-        output[i] = input[i] ^ lfsr_generate();
+        output[i] = input[i] ^ lfsr_generate_byte();
     }
     output[len] = '\0';
 }
@@ -306,7 +387,11 @@ CRYPTO_API void des_encrypt(const char* plaintext, const char* key, char* output
     DES_key_schedule schedule;
     DES_cblock key_block;
 
-    // 处理密钥（取前8字节或填充）
+    // 澶勭悊瀵嗛挜锛堝彇鍓?瀛楄妭鎴栧～鍏咃級
+    if (!key || key[0] == '\0') {
+        output[0] = '\0';
+        return;
+    }
     int key_len = strlen(key);
     for (int i = 0; i < 8; i++) {
         key_block[i] = key[i % key_len];
@@ -327,7 +412,7 @@ CRYPTO_API void des_encrypt(const char* plaintext, const char* key, char* output
         DES_ecb_encrypt((DES_cblock*)(buffer + i), (DES_cblock*)(output + i), &schedule, DES_ENCRYPT);
     }
     
-    // 转为十六进制输出，防止由于密文中存在 \x00 导致后面当字符串处理时被截断报错
+    // 杞负鍗佸叚杩涘埗杈撳嚭锛岄槻姝㈢敱浜庡瘑鏂囦腑瀛樺湪 \x00 瀵艰嚧鍚庨潰褰撳瓧绗︿覆澶勭悊鏃惰鎴柇鎶ラ敊
     int hex_offset = 0;
     char* temp_hex = new char[padded_len * 2 + 1];
     for (int i = 0; i < padded_len; i++) {
@@ -343,6 +428,10 @@ CRYPTO_API void des_decrypt(const char* ciphertext_hex, const char* key, char* o
     DES_key_schedule schedule;
     DES_cblock key_block;
 
+    if (!key || key[0] == '\0') {
+        output[0] = '\0';
+        return;
+    }
     int key_len = strlen(key);
     for (int i = 0; i < 8; i++) {
         key_block[i] = key[i % key_len];
@@ -363,25 +452,14 @@ CRYPTO_API void des_decrypt(const char* ciphertext_hex, const char* key, char* o
         DES_ecb_encrypt((DES_cblock*)(buffer + i), (DES_cblock*)(output + i), &schedule, DES_DECRYPT);
     }
 
-    // 去除填充
+    // 鍘婚櫎濉厖
     int padding = output[len - 1];
     output[len - padding] = '\0';
 
     delete[] buffer;
 }
 
-// ==================== RSA 非对称加密 ====================
-static long long mod_exp(long long base, long long exp, long long mod) {
-    long long res = 1;
-    base = base % mod;
-    while (exp > 0) {
-        if (exp % 2 == 1) res = (res * base) % mod;
-        exp = exp >> 1;
-        base = (base * base) % mod;
-    }
-    return res;
-}
-
+// ==================== RSA 闈炲绉板姞瀵?====================
 static long long extgcd(long long a, long long b, long long &x, long long &y) {
     if (b == 0) { x = 1; y = 0; return a; }
     long long x1, y1;
@@ -391,112 +469,267 @@ static long long extgcd(long long a, long long b, long long &x, long long &y) {
     return d;
 }
 
-static bool is_prime(long long n) {
-    if(n < 2) return false;
-    for(long long i=2; i*i<=n; ++i) {
-        if(n%i == 0) return false;
-    }
+
+static bool split_key(const char* key, std::string& n_text, std::string& exp_text) {
+    if (!key) return false;
+    const char* comma = strchr(key, ',');
+    if (!comma || comma == key || comma[1] == '\0') return false;
+    n_text.assign(key, comma - key);
+    exp_text.assign(comma + 1);
     return true;
 }
 
-static long long get_rand_prime() {
-    while(true) {
-        // 修改随机区间：生成 100 到 249 的素数，确保 n = p*q 大于 255 避免丢失单字节，同时小于 65535 不超 `%04llx` 格式的限制
-        unsigned int r = 0;
-        if (RAND_bytes((unsigned char*)&r, sizeof(r)) != 1) {
-            r = (unsigned int)rand();
-        }
-        long long p = r % 150 + 100;
-        if (is_prime(p)) return p;
+static BIGNUM* bn_from_hex_text(const std::string& text) {
+    BIGNUM* bn = nullptr;
+    if (BN_hex2bn(&bn, text.c_str()) == 0) {
+        BN_free(bn);
+        return nullptr;
     }
+    return bn;
+}
+
+static int rsa_hex_width(const BIGNUM* n) {
+    return BN_num_bytes(n) * 2;
+}
+
+static void write_padded_hex(char* output, int& offset, const BIGNUM* value, int width) {
+    char* hex = BN_bn2hex(value);
+    int len = (int)strlen(hex);
+    for (int i = len; i < width; i++) output[offset++] = '0';
+    memcpy(output + offset, hex, len);
+    offset += len;
+    OPENSSL_free(hex);
 }
 
 CRYPTO_API void rsa_generate_keys(int bits, char* public_key, char* private_key) {
-    static bool seeded = false;
-    if (!seeded) {
-        srand((unsigned int)time(NULL));
-        seeded = true;
-    }
+    if (bits < 512) bits = 512;
+    if (bits % 2 != 0) bits++;
 
-    long long p, q;
-    do { p = get_rand_prime(); q = get_rand_prime(); } while(p == q);
-    long long n = p * q;
-    long long phi = (p-1)*(q-1);
-    long long e = 3;
-    while(true) {
-        long long x, y;
-        if (extgcd(e, phi, x, y) == 1) break;
-        e += 2;
-    }
-    long long x, y;
-    extgcd(e, phi, x, y);
-    long long d = (x % phi + phi) % phi;
-    sprintf(public_key, "%lld,%lld", n, e);
-    sprintf(private_key, "%lld,%lld", n, d);
+    BN_CTX* ctx = BN_CTX_new();
+    BIGNUM* p = BN_new();
+    BIGNUM* q = BN_new();
+    BIGNUM* n = BN_new();
+    BIGNUM* phi = BN_new();
+    BIGNUM* p_minus_1 = BN_new();
+    BIGNUM* q_minus_1 = BN_new();
+    BIGNUM* e = BN_new();
+    BIGNUM* d = BN_new();
+    BIGNUM* gcd = BN_new();
+
+    BN_set_word(e, 65537);
+    do {
+        BN_generate_prime_ex(p, bits / 2, 0, nullptr, nullptr, nullptr);
+        do {
+            BN_generate_prime_ex(q, bits / 2, 0, nullptr, nullptr, nullptr);
+        } while (BN_cmp(p, q) == 0);
+
+        BN_sub(p_minus_1, p, BN_value_one());
+        BN_sub(q_minus_1, q, BN_value_one());
+        BN_mul(phi, p_minus_1, q_minus_1, ctx);
+        BN_gcd(gcd, e, phi, ctx);
+    } while (!BN_is_one(gcd));
+
+    BN_mul(n, p, q, ctx);
+    BN_mod_inverse(d, e, phi, ctx);
+
+    char* n_hex = BN_bn2hex(n);
+    char* e_hex = BN_bn2hex(e);
+    char* d_hex = BN_bn2hex(d);
+    sprintf(public_key, "%s,%s", n_hex, e_hex);
+    sprintf(private_key, "%s,%s", n_hex, d_hex);
+
+    OPENSSL_free(n_hex);
+    OPENSSL_free(e_hex);
+    OPENSSL_free(d_hex);
+    BN_free(p);
+    BN_free(q);
+    BN_free(n);
+    BN_free(phi);
+    BN_free(p_minus_1);
+    BN_free(q_minus_1);
+    BN_free(e);
+    BN_free(d);
+    BN_free(gcd);
+    BN_CTX_free(ctx);
 }
 
 CRYPTO_API void rsa_encrypt(const char* plaintext, const char* public_key, char* output) {
-    long long n, e;
-    sscanf(public_key, "%lld,%lld", &n, &e);
+    std::string n_text, e_text;
+    if (!split_key(public_key, n_text, e_text)) {
+        output[0] = '\0';
+        return;
+    }
+
+    BIGNUM* n = bn_from_hex_text(n_text);
+    BIGNUM* e = bn_from_hex_text(e_text);
+    if (!n || !e) {
+        output[0] = '\0';
+        BN_free(n);
+        BN_free(e);
+        return;
+    }
+
+    BIGNUM* m = BN_new();
+    BIGNUM* c = BN_new();
+    BN_CTX* ctx = BN_CTX_new();
+    int width = rsa_hex_width(n);
     int len = strlen(plaintext);
     int offset = 0;
-    for (int i=0; i<len; i++) {
-        long long m = (unsigned char)plaintext[i];
-        long long c = mod_exp(m, e, n);
-        offset += sprintf(output + offset, "%04llx", c);
+    for (int i = 0; i < len; i++) {
+        BN_set_word(m, (unsigned char)plaintext[i]);
+        BN_mod_exp(c, m, e, n, ctx);
+        write_padded_hex(output, offset, c, width);
     }
     output[offset] = '\0';
+
+    BN_free(n);
+    BN_free(e);
+    BN_free(m);
+    BN_free(c);
+    BN_CTX_free(ctx);
 }
 
 CRYPTO_API void rsa_decrypt(const char* ciphertext_hex, const char* private_key, char* output) {
-    long long n, d;
-    sscanf(private_key, "%lld,%lld", &n, &d);
-    int len = strlen(ciphertext_hex) / 4;
-    for (int i=0; i<len; i++) {
-        long long c;
-        sscanf(ciphertext_hex + i*4, "%04llx", &c);
-        long long m = mod_exp(c, d, n);
-        output[i] = (char)m;
+    std::string n_text, d_text;
+    if (!split_key(private_key, n_text, d_text)) {
+        output[0] = '\0';
+        return;
     }
-    output[len] = '\0';
+
+    BIGNUM* n = bn_from_hex_text(n_text);
+    BIGNUM* d = bn_from_hex_text(d_text);
+    if (!n || !d) {
+        output[0] = '\0';
+        BN_free(n);
+        BN_free(d);
+        return;
+    }
+
+    BIGNUM* c = BN_new();
+    BIGNUM* m = BN_new();
+    BN_CTX* ctx = BN_CTX_new();
+    int width = rsa_hex_width(n);
+    int hex_len = strlen(ciphertext_hex);
+    if (width <= 0 || hex_len % width != 0) {
+        output[0] = '\0';
+    } else {
+        int blocks = hex_len / width;
+        std::string chunk;
+        for (int i = 0; i < blocks; i++) {
+            chunk.assign(ciphertext_hex + i * width, width);
+            BN_hex2bn(&c, chunk.c_str());
+            BN_mod_exp(m, c, d, n, ctx);
+            output[i] = (char)BN_get_word(m);
+        }
+        output[blocks] = '\0';
+    }
+
+    BN_free(n);
+    BN_free(d);
+    BN_free(c);
+    BN_free(m);
+    BN_CTX_free(ctx);
 }
 
-// ==================== RSA 数字签名 ====================
 CRYPTO_API void rsa_sign(const char* message, const char* private_key, char* signature) {
     unsigned char hash[SHA256_DIGEST_LENGTH];
     SHA256((unsigned char*)message, strlen(message), hash);
-    long long n, d;
-    sscanf(private_key, "%lld,%lld", &n, &d);
+
+    std::string n_text, d_text;
+    if (!split_key(private_key, n_text, d_text)) {
+        signature[0] = '\0';
+        return;
+    }
+
+    BIGNUM* n = bn_from_hex_text(n_text);
+    BIGNUM* d = bn_from_hex_text(d_text);
+    if (!n || !d) {
+        signature[0] = '\0';
+        BN_free(n);
+        BN_free(d);
+        return;
+    }
+
+    BIGNUM* m = BN_new();
+    BIGNUM* s = BN_new();
+    BN_CTX* ctx = BN_CTX_new();
+    int width = rsa_hex_width(n);
     int offset = 0;
-    for (int i=0; i<SHA256_DIGEST_LENGTH; i++) {
-        long long m = hash[i];
-        long long c = mod_exp(m, d, n);
-        offset += sprintf(signature + offset, "%04llx", c);
+    for (int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
+        BN_set_word(m, hash[i]);
+        BN_mod_exp(s, m, d, n, ctx);
+        write_padded_hex(signature, offset, s, width);
     }
     signature[offset] = '\0';
+
+    BN_free(n);
+    BN_free(d);
+    BN_free(m);
+    BN_free(s);
+    BN_CTX_free(ctx);
 }
 
 CRYPTO_API int rsa_verify(const char* message, const char* signature_hex, const char* public_key) {
     unsigned char hash[SHA256_DIGEST_LENGTH];
     SHA256((unsigned char*)message, strlen(message), hash);
-    long long n, e;
-    sscanf(public_key, "%lld,%lld", &n, &e);
-    int len = strlen(signature_hex) / 4;
-    if (len != SHA256_DIGEST_LENGTH) return 0;
-    for (int i=0; i<len; i++) {
-        long long c;
-        sscanf(signature_hex + i*4, "%04llx", &c);
-        long long m = mod_exp(c, e, n);
-        if ((unsigned char)m != hash[i]) return 0;
+
+    std::string n_text, e_text;
+    if (!split_key(public_key, n_text, e_text)) return 0;
+
+    BIGNUM* n = bn_from_hex_text(n_text);
+    BIGNUM* e = bn_from_hex_text(e_text);
+    if (!n || !e) {
+        BN_free(n);
+        BN_free(e);
+        return 0;
     }
+
+    BIGNUM* s = BN_new();
+    BIGNUM* m = BN_new();
+    BN_CTX* ctx = BN_CTX_new();
+    int width = rsa_hex_width(n);
+    int sig_len = strlen(signature_hex);
+    if (width <= 0 || sig_len != SHA256_DIGEST_LENGTH * width) {
+        BN_free(n);
+        BN_free(e);
+        BN_free(s);
+        BN_free(m);
+        BN_CTX_free(ctx);
+        return 0;
+    }
+
+    std::string chunk;
+    for (int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
+        chunk.assign(signature_hex + i * width, width);
+        BN_hex2bn(&s, chunk.c_str());
+        BN_mod_exp(m, s, e, n, ctx);
+        if ((unsigned char)BN_get_word(m) != hash[i]) {
+            BN_free(n);
+            BN_free(e);
+            BN_free(s);
+            BN_free(m);
+            BN_CTX_free(ctx);
+            return 0;
+        }
+    }
+
+    BN_free(n);
+    BN_free(e);
+    BN_free(s);
+    BN_free(m);
+    BN_CTX_free(ctx);
     return 1;
 }
 
-// ==================== D-H 密钥交换 ====================
 CRYPTO_API void dh_generate_params(char* p, char* g) {
-    // 使用预定义的素数和原根（注意：BN_hex2bn不能带有 0x 前缀）
+    // 浣跨敤棰勫畾涔夌殑绱犳暟鍜屽師鏍癸紙娉ㄦ剰锛欱N_hex2bn涓嶈兘甯︽湁 0x 鍓嶇紑锛?
     strcpy(p, "D5F6C9C2A7B9E8F1D3A4B6C8E9F2A1B4C6D8E0F3A5B7C9D1E4F6A8B0C2D5E7F9A1B3C5D7E9F0A2B4C6D8E1F3A5B7C0D2E4F6A8B1C3D5E7F9A2B4C6D9E0F2A4B6C8D0E3A5B7C1D3E5F7A9B2C4D6E8F1A3B5C7D0E2A4B6C8D1E3A5B7C9D2E4F6A8B0C2D4E6F8A1B3C5D7E9F1A3B5C7D0E2A4B6C8D1E3A5B7C0D2E4F6A8B1C3D5E7F9A2B4C6D8E0F3A5B7C1D3E5F7A9B2C4D6E8F0A2B4C6D9E1F3A5B7C0D2E4F6A8B1C3D5E7F9A2B4C6D8E0F2A4B6C8D1E3A5B7C9D2E4F6A8B0C2D4E6F8A1B3C5D7E9F1");
-    strcpy(g, "5");
+    BIGNUM* p_bn = BN_get_rfc3526_prime_2048(nullptr);
+    char* p_hex = BN_bn2hex(p_bn);
+    strcpy(p, p_hex);
+    strcpy(g, "2");
+    OPENSSL_free(p_hex);
+    BN_free(p_bn);
 }
 
 CRYPTO_API void dh_generate_keypair(const char* p, const char* g, char* public_key, char* private_key) {
@@ -509,7 +742,10 @@ CRYPTO_API void dh_generate_keypair(const char* p, const char* g, char* public_k
     BIGNUM* pub = BN_new();
     BN_CTX* ctx = BN_CTX_new();
 
-    BN_rand(priv, 256, -1, 0);
+    BIGNUM* range = BN_dup(p_bn);
+    BN_sub_word(range, 3);
+    BN_rand_range(priv, range);
+    BN_add_word(priv, 2);
     BN_mod_exp(pub, g_bn, priv, p_bn, ctx);
 
     char* priv_hex = BN_bn2hex(priv);
@@ -525,6 +761,7 @@ CRYPTO_API void dh_generate_keypair(const char* p, const char* g, char* public_k
     BN_free(g_bn);
     BN_free(priv);
     BN_free(pub);
+    BN_free(range);
 }
 
 CRYPTO_API void dh_compute_shared_secret(const char* public_key, const char* private_key, const char* p, char* shared_secret) {

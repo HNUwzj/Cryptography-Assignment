@@ -47,7 +47,7 @@ def demo_dh_auth_exchange():
     print("================ D-H 增强认证通信演示 ================")
 
     print("\n[Client] 生成 RSA 身份密钥")
-    client_rsa_pub, client_rsa_priv = rsa_generate_keys(16)
+    client_rsa_pub, client_rsa_priv = rsa_generate_keys(1024)
     print(f"         Client PublicKey = {client_rsa_pub}")
 
     p, g = dh_generate_params()
