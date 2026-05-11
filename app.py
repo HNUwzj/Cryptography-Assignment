@@ -15,6 +15,19 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 app = Flask(__name__)
 app.secret_key = 'crypto-lab-secret-key-2024'
 
+def load_local_env():
+    env_path = Path(app.root_path) / '.env'
+    if not env_path.exists():
+        return
+    for line in env_path.read_text(encoding='utf-8-sig').splitlines():
+        line = line.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+        key, value = line.split('=', 1)
+        os.environ.setdefault(key.strip().lstrip('\ufeff'), value.strip().strip('"').strip("'"))
+
+load_local_env()
+
 # 尝试导入加密库
 crypto_available = False
 try:
